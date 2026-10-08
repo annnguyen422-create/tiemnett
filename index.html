@@ -151,6 +151,28 @@ body.kb #tray{bottom:calc(58px + 118px + env(safe-area-inset-bottom))}
 #trayItems button.confirm{background:#FDE5E5;border-color:var(--bad)}
 #trayItems .q{position:absolute;top:-7px;right:-7px;font-style:normal;font-size:11px;background:var(--warn);border-radius:999px;padding:0 4px;border:1px solid #303030}
 #trayItems .sep{width:2px;align-self:stretch;background:var(--line);margin:0 4px}
+#bar button{min-width:0;flex:1}
+.ks .tb{height:13px;bottom:-17px;left:-7px;right:-7px;border-width:2px;border-radius:6px}
+.ks .tb b{width:4px;margin-left:-2px}
+.kpb{position:relative;width:74px;height:11px;background:#cfcfcf;border:1.5px solid #303030;border-radius:5px;overflow:hidden;margin-top:3px}
+.kpb i{position:absolute;top:0;bottom:0} .kpb .zp{background:#58B368} .kpb .zo{background:#F2B84B}
+.kpb b{position:absolute;top:0;bottom:0;width:4px;background:#303030;margin-left:-2px}
+.kbs button{position:relative}
+.kx{margin-left:auto;min-height:36px;width:36px;padding:0;border-radius:50%}
+.tutc{background:#FFF0D6;border:2px solid var(--pri);border-radius:12px;padding:6px 10px;font-size:13px;line-height:1.45}
+.tutc button{margin-top:4px}
+.kneed{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:13px}
+[data-act="kst"].coach{outline:3px dashed var(--blue);outline-offset:4px;border-radius:10px;animation:coachp .8s infinite alternate}
+@keyframes coachp{to{outline-offset:9px}}
+.autob{position:absolute;top:-9px;left:6px;background:var(--acc);color:#fff;font-size:11px;font-weight:900;border:2px solid var(--dark);border-radius:999px;padding:0 6px;pointer-events:none}
+.badge.bad{background:#FDE5E5}
+.prow{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px dashed var(--line)}
+.prow .pv{min-width:48px;text-align:center}
+.prow small{display:block}
+.scard{border:2px solid var(--dark);border-radius:14px;padding:10px 12px;margin:8px 0;display:flex;gap:10px;align-items:flex-start}
+.scard.on{background:#E5F6EC}
+.staffch .ptag{background:var(--acc)}
+body.kb #tray{display:none}
 </style>
 </head>
 <body>
@@ -1591,6 +1613,352 @@ function runTests(){
  S=saved;SERVING=sv;TEST=false;NOSPAWN=false;
  try{console.table(R)}catch(e){}
  return R}
+ /* ================= PHASE 3 — STAFF · UPGRADES · EXPIRY · PRICES · TUTORIAL ================= */
+CFG.PAT_WAIT=1.6;CFG.PAT_ORDER=1.5;
+const STAFF={cashier:{hire:400000,salary:150000,every:2},cook:{hire:700000,salary:200000,every:1}};
+const STAFF_LOOK={cook:{skin:'#F6CBA0',hair:'#3b3b3b',shirt:'#fff',pants:'#303030',style:0,acc:1,accColor:'#ffffff'},cashier:{skin:'#FFE0C2',hair:'#2b2420',shirt:'#5B9DEF',pants:'#3a4a6b',style:1,acc:0}};
+const UPGRADES=[{id:'stove_auto',grp:'kitchen',price:900000},{id:'fryer_auto',grp:'kitchen',price:1200000},{id:'stove_fast',grp:'kitchen',price:700000},{id:'fryer_fast',grp:'kitchen',price:800000},{id:'shaker',grp:'kitchen',price:400000},{id:'tray_big',grp:'kitchen',price:500000},{id:'monitor',grp:'room',price:2400000},{id:'chairs',grp:'room',price:1600000},{id:'aircon',grp:'room',price:1500000}];
+const UPG_BY=Object.fromEntries(UPGRADES.map(u=>[u.id,u]));
+const SHELF={cavien:3,bovien:3,tomvien:2,xucxich:4,holo:3};
+const CHAIN={noodlebox:['noodle'],board:['noodle','fried'],stove:['noodle'],freezer:['fried'],fryer:['fried'],bar:['mix'],fridge:['bottle'],trash:[]};
+Object.assign(STR.vi,{
+ nav_staff:'Nhân viên',nav_upg:'Nâng cấp',staff_cashier:'Thu ngân',staff_cook:'Đầu bếp',
+ staffd_cashier:'Tự đón khách ở quầy: nạp đúng số khách xin và xếp máy đúng loại. Tự nạp thêm khi khách đang chơi gọi.',
+ staffd_cook:'Tự nấu mì (đúng topping), chiên, pha nước và lấy nước chai theo đơn, để sẵn trên khay. Bạn chỉ cần mang ra cho khách.',
+ staff_t:'Nhân viên',staff_note:'Chỉ thuê được 1 người cùng lúc. Mỗi lần thuê trả phí tuyển. Lương trả cuối mỗi ngày người đó có làm.',
+ staff_fee:'Phí tuyển {fee} · Lương {sal}/ngày',staff_hire:'Thuê',staff_fire:'Cho nghỉ',staff_working:'Đang làm',
+ err_staff_one:'Chỉ được thuê 1 người. Cho người đang làm nghỉ trước.',toast_hired:'Đã thuê {name}',toast_fired:'Đã cho nghỉ việc',toast_upg:'Đã nâng cấp: {name}',toast_tut_reset:'Hướng dẫn sẽ hiện lại khi bạn tới bếp',
+ tx_hire:'Phí tuyển {name}',tx_salary:'Lương {name}',e_salary:'Lương nhân viên',e_hire:'Phí tuyển',e_upgrade:'Đầu tư nâng cấp',staff_today:'{name} đang làm cho tiệm (lương {s}/ngày).',
+ upg_t:'Nâng cấp',upg_kitchen:'Bếp và dụng cụ',upg_room:'Phòng máy',upg_owned:'✓ Đã có',upg_buy:'Mua',err_upg_owned:'Đã có nâng cấp này rồi.',
+ upg_stove_auto:'Bếp hẹn giờ',upgd_stove_auto:'Mì chín tới là tự hạ lửa giữ nóng: không bao giờ nở hay hỏng.',
+ upg_fryer_auto:'Chảo chiên tự ngắt',upgd_fryer_auto:'Chiên vàng giòn là tự nhấc rổ: không bao giờ cháy.',
+ upg_stove_fast:'Bếp từ công suất cao',upgd_stove_fast:'Mì chín nhanh hơn (6 → 4 phút game).',
+ upg_fryer_fast:'Chảo dầu lớn',upgd_fryer_fast:'Đồ chiên chín nhanh hơn (5 → 3,5 phút game).',
+ upg_shaker:'Máy lắc trà',upgd_shaker:'Lắc nhanh gấp đôi (2 → 1 phút game).',
+ upg_tray_big:'Khay inox lớn',upgd_tray_big:'Khay chứa 6 món thay vì 4.',
+ upg_monitor:'Màn hình 144Hz',upgd_monitor:'Khách vui hơn khi ngồi máy (+6, game thủ +10). Giá giờ mọi máy +2.000đ.',
+ upg_chairs:'Ghế gaming êm',upgd_chairs:'Khách chơi lâu hơn 20% và vui hơn (+5).',
+ upg_aircon:'Máy lạnh mới',upgd_aircon:'Khách kiên nhẫn hơn 30% ở quầy, 15% khi chờ món. Tiền điện +20.000đ/ngày.',
+ shelf_life:'Hạn dùng {d} ngày',exp_today:'hết hạn cuối hôm nay',exp_in:'còn {d} ngày',exp_warn:'{n} sắp hỏng',expired_line:'Đã bỏ hàng hết hạn: {items} (mất {v}).',
+ price_t:'Giá bán',price_note:'Bấm − / + để đổi giá (bước 1.000đ, 50%–200% giá gốc). Giá cao hơn gốc thì khách ít gọi món đó hơn.',cost_short:'Vốn',margin:'lãi',base_price:'gốc',err_price_range:'Giá phải từ {lo} đến {hi}.',
+ coach:'Gợi ý nấu trên bản đồ',tut_again:'Xem lại hướng dẫn nấu/pha',kb_need:'Cần làm',kb_none:'chưa có đơn',kb_return:'trả lại',tut_ok:'Đã hiểu',
+ tut_t_noodle:'Cách nấu mì',tut_t_fried:'Cách chiên',tut_t_mix:'Cách pha nước',
+ tut_noodle:['1. Thùng mì: bấm đúng loại gói. Cầm nhầm thì bấm loại khác để đổi, bấm lại để trả.','2. Bàn sơ chế: bấm ô trống để đặt gói → bấm tiếp để bóc → bấm để cho vào tô.','3. Bấm hũ topping khách gọi (trứng, xúc xích, cá viên, rau) → bấm tô để nêm.','4. Bấm tô để bưng → sang Bếp bấm ô trống để bắc lên.','5. Vớt khi vạch đen nằm trong vùng XANH. Món lên khay → bấm khách để giao.'],
+ tut_fried:['1. Tủ đông: bấm đúng loại (bấm loại khác để đổi).','2. Chảo chiên: bấm ô trống để thả vào.','3. Vớt khi vạch đen vào vùng XANH (vàng giòn). Để lâu sẽ cháy.','4. Bàn sơ chế: bấm ô trống để bày ra đĩa → bấm hũ Tương.','5. Bấm đĩa để ra khay → bấm khách để giao.'],
+ tut_mix:['1. Bấm hũ Ly để đặt ly ra quầy.','2. Bấm Đá, rồi Trà hoặc Cà phê.','3. Bấm Chanh, Đào hoặc Sữa. Trà chanh = trà + chanh · Trà đào = trà + đào · Cà phê sữa = cà phê + sữa.','4. Bấm ly để lắc, xong thì bấm ly để ra khay.'],
+ step_RETURN:'Trả lại kho',step_SWAP:'Đổi loại',
+ hk_pack:'Đặt gói mì lên Bàn sơ chế (bấm loại khác ở Thùng mì để đổi).',hk_raw:'Thả vào Chảo chiên (bấm loại khác ở Tủ đông để đổi).'});
+Object.assign(DIALOGUE.vi,{pricey:['Đắt quá, thôi khỏi.','Giá này hơi chát anh ơi.']});
+
+/* ---------- state ---------- */
+function newState(){
+ const s={v:CFG.VERSION,day:1,time:CFG.OPEN-30,phase:'PREP',speed:1,paused:false,money:CFG.START_MONEY,rating:4,
+  pcs:PC_LAYOUT.map((p,i)=>({id:i+1,tier:p[0],x:p[1],y:p[2],status:'AVAILABLE',condition:100,performance:PC_TIERS[p[0]].perf,hourlyRate:PC_TIERS[p[0]].rate,currentCustomer:null,sessionTime:0,revenue:0})),
+  inv:Object.fromEntries(ITEMS.map(i=>[i.id,i.start])),k:emptyKitchen(),hand:null,sel:{},
+  tray:[],customers:[],accounts:{},tx:[],history:[],seq:{c:0,tx:0,order:1000},player:{x:CFG.COUNTER_SPOT.x,y:CFG.COUNTER_SPOT.y,flip:false},
+  today:null,report:null,settings:{sound:true,coach:true},tutorialDone:false,lots:{},staff:null,upg:{},prices:{},tutSeen:{}};
+ s.today=freshToday(s.money);return s}
+function applyUpgrades(){if(!S)return;const u=S.upg||{};
+ COOK.noodle.T=u.stove_fast?4:6;COOK.fried.T=u.fryer_fast?3.5:5;COOK.shake=u.shaker?1:2;CFG.TRAY_MAX=u.tray_big?6:4;
+ const bonus=u.monitor?2000:0;for(const p of S.pcs)p.hourlyRate=PC_TIERS[p.tier].rate+bonus}
+
+/* ---------- giá ---------- */
+function priceOf(r){const R=MENU_BY[r];if(!R)return 0;const p=S&&S.prices?S.prices[R.id]:null;return p!=null?p:R.price}
+function itemPrice(it){return priceOf(it.r)+(it.top||[]).reduce((s,x)=>s+(TOPPINGS[x]?TOPPINGS[x].price:0),0)}
+function setPrice(r,p){const R=MENU_BY[r];if(!R)return KE('err_generic');if(S.phase==='REPORT')return KE('err_report');
+ p=Math.round(p/1000)*1000;const lo=Math.max(1000,Math.round(R.price*.5/1000)*1000),hi=R.price*2;
+ if(p<lo||p>hi)return KE('err_price_range',{lo:vk(lo),hi:vk(hi)});S.prices=S.prices||{};if(p===R.price)delete S.prices[R.id];else S.prices[R.id]=p;return KO('PRICE')}
+function recipeCost(r){const R=MENU_BY[r],c=id=>ITEM_BY[id]?ITEM_BY[id].cost:0;if(!R)return 0;
+ if(R.type==='noodle')return c(R.base)+c('to');if(R.type==='fried')return c(R.base)+c('dia')+c('tuong');
+ if(R.type==='mix'){const m=MIX[R.id];return c(m.base)+c(m.flavor)+c('ly')}return c(R.base)}
+
+/* ---------- lô hàng + hạn dùng ---------- */
+function syncLots(id){if(!SHELF[id])return;S.lots=S.lots||{};const L=S.lots[id]=(S.lots[id]||[]).filter(l=>l.n>0);
+ let sum=L.reduce((a,l)=>a+l.n,0);const inv=S.inv[id]||0;L.sort((a,b)=>a.exp-b.exp);
+ if(sum<inv)L.push({n:inv-sum,exp:S.day+SHELF[id]});
+ while(sum>inv&&L.length){const l=L[0],d=Math.min(l.n,sum-inv);l.n-=d;sum-=d;if(!l.n)L.shift()}
+ L.sort((a,b)=>a.exp-b.exp)}
+function takeStock(id){if((S.inv[id]||0)<=0)return null;syncLots(id);S.inv[id]--;let exp=null;
+ if(SHELF[id]){const L=S.lots[id];if(L.length){L[0].n--;exp=L[0].exp;if(!L[0].n)L.shift()}}return{exp}}
+function returnStock(id,exp){if(SHELF[id])syncLots(id);S.inv[id]=(S.inv[id]||0)+1;
+ if(SHELF[id]){S.lots[id].push({n:1,exp:exp!=null?exp:S.day+SHELF[id]});S.lots[id].sort((a,b)=>a.exp-b.exp)}}
+function expireLots(){const out={};for(const id in SHELF){syncLots(id);const L=S.lots[id];let n=0;
+ while(L.length&&L[0].exp<S.day){n+=L[0].n;L.shift()}if(n){S.inv[id]-=n;out[id]=n}}S.today.expired=out;return out}
+function buyStock(id,qty){
+ const it=ITEM_BY[id];qty=Math.floor(qty);if(!it||!(qty>0))return{ok:false,err:'err_generic'};if(S.phase==='REPORT')return{ok:false,err:'err_report'};
+ const cost=it.cost*qty;if(S.money<cost)return{ok:false,err:'err_money'};
+ if(SHELF[id])syncLots(id);S.inv[id]+=qty;
+ if(SHELF[id]){S.lots[id].push({n:qty,exp:S.day+SHELF[id]});S.lots[id].sort((a,b)=>a.exp-b.exp)}
+ addTx(-cost,'INVENTORY_PURCHASE',t('tx_buy',{n:qty,unit:it.unit,item:itemName(id)}));S.today.purchases+=cost;return{ok:true,cost}}
+
+/* ---------- lấy nguyên liệu (có đổi/trả) ---------- */
+function kBin(st,id){
+ const K=KIT[st];if(!K||!(K.bins||[]).some(b=>b[0]===id))return KE('err_generic');
+ const h=S.hand,has=()=>id==='da'||(S.inv[id]||0)>0;
+ if(st==='noodlebox'||st==='freezer'){const kind=st==='noodlebox'?'pack':'raw';
+  if(h&&h.k===kind){
+   if(h.b===id){returnStock(h.b,h.exp);S.hand=null;return KO('RETURN')}
+   if(!has())return KE('err_stock',{item:itemName(id)});
+   returnStock(h.b,h.exp);const tk=takeStock(id);S.hand={k:kind,b:id,exp:tk?tk.exp:null};return KO('SWAP')}
+  if(h)return KE('err_hand_full',{item:wiName(h)});if(!has())return KE('err_stock',{item:itemName(id)});
+  const tk=takeStock(id);S.hand={k:kind,b:id,exp:tk?tk.exp:null};return KO(st==='noodlebox'?'TAKE_NOODLES':'TAKE_FRY')}
+ if(st==='fridge'){if(S.tray.length>=CFG.TRAY_MAX)return KE('tray_full');if(!has())return KE('err_stock',{item:itemName(id)});
+  takeStock(id);S.tray.push({r:id,top:[],q:100});return KO('TAKE_DRINK')}
+ if(st==='board'){
+  if(id==='tuong'){const i=pickTarget('board',w=>w.k==='plate'&&!w.sauce);if(i<0)return KE('err_no_target_sauce');if(!has())return KE('err_stock',{item:itemName(id)});
+   takeStock('tuong');S.k.board[i].sauce=true;return KO('ADD_SAUCE')}
+  const i=pickTarget('board',w=>w.k==='bowl'&&(w.st==='bowl'||w.st==='seasoned')&&!w.top.includes(id)&&w.top.length<3);
+  if(i<0)return KE('err_no_target_top');if(!has())return KE('err_stock',{item:itemName(id)});
+  takeStock(id);S.k.board[i].top.push(id);return KO('ADD_TOPPING')}
+ if(st==='bar'){
+  if(id==='ly'){const i=S.k.bar.indexOf(null);if(i<0)return KE('err_station_busy',{st:t('st_bar')});return placeCup(i)}
+  const slot=id==='da'?'ice':BASES.includes(id)?'base':'flavor';
+  const i=pickTarget('bar',w=>w.st==='open'&&!w[slot]);if(i<0)return KE('err_no_target_cup');if(!has())return KE('err_stock',{item:itemName(id)});
+  if(id!=='da')takeStock(id);S.k.bar[i][slot]=id==='da'?true:id;return KO(slot==='ice'?'ADD_ICE':slot==='base'?'ADD_BASE':'ADD_FLAVOR')}
+ return KE('err_generic')}
+
+/* ---------- khách: kiên nhẫn + giá + nâng cấp phòng máy ---------- */
+function spawnCustomer(o){
+ o=o||{};const per=period(S.time);let acc=null;
+ if(!o.type){const names=Object.keys(S.accounts);if(names.length&&Math.random()<.35){const n=pick(names);if(!S.customers.some(c=>c.name===n))acc=S.accounts[n]}}
+ const T=o.type?CT[o.type]:acc?CT[acc.type]:wpick(CTYPES,x=>x.w[per]);
+ const money=rint(T.money[0]/1000,T.money[1]/1000)*1000,balance=acc?acc.balance:0,pat=Math.round(50*T.pat*CFG.PAT_WAIT*(S.upg&&S.upg.aircon?1.3:1));
+ const c={id:++S.seq.c,name:acc?acc.name:newName(),type:T.id,look:acc?acc.look:randLook(T),money,balance,returning:!!acc,
+  state:'ENTER',x:CFG.DOOR.x,y:CFG.DOOR.y,path:[],flip:false,pcId:null,patienceMax:pat,patience:pat,happiness:70,
+  gamingTime:rint(T.play[0],T.play[1]),played:0,hunger:rint(0,45),thirst:rint(0,45),
+  preferredPC:T.prefer,preferredFood:pick(T.foods),preferredDrink:pick(T.drinks),
+  order:null,orderPatience:0,orderPatienceMax:1,lastOrderT:S.time,eatT:0,rechargeReq:0,rechargePatience:0,rechargePatienceMax:1,reqCooldown:0,
+  say:null,joke:T.id==='hocsinh'&&Math.random()<.25,askAmt:0,askText:''};
+ if(c.joke)c.gamingTime=Math.max(c.gamingTime,180);
+ let ask=rint(T.recharge[0]/10000,T.recharge[1]/10000)*10000;if(balance>=30000)ask=0;
+ c.askAmt=Math.min(ask,Math.floor(money/10000)*10000);
+ c.askText=c.joke?line('joke'):line(T.prefer==='gaming'?'ask_gaming':(Math.random()<.3?'ask_cheap':'ask'));
+ S.customers.push(c);S.today.visitors++;fx.sfx('bell');return c}
+function maybeOrder(c,force){
+ const T=CT[c.type],items=[];let budget=c.money,skipped=false;
+ const add=(r,top)=>{if(!MENU_BY[r])return false;const ratio=priceOf(r)/MENU_BY[r].price;
+  if(!force&&ratio>1&&Math.random()<Math.min(.9,(ratio-1)*1.2)){skipped=true;return false}
+  const it={r,top:top||[],done:false},p=itemPrice(it);if(p<=budget){items.push(it);budget-=p;return true}return false};
+ if(c.hunger>=60||force){const f=(MENU_BY[c.preferredFood]&&Math.random()<.6)?c.preferredFood:pick(T.foods);const top=[];
+  if(MENU_BY[f]&&MENU_BY[f].type==='noodle'){if(Math.random()<.55)top.push(pick(TOP_IDS));if(Math.random()<.15){const x=pick(TOP_IDS);if(!top.includes(x))top.push(x)}}
+  if(!add(f,top))add(f,[]);if(Math.random()<.2)add(pick(['cavien','bovien','tomvien','xx_chien','holo']),[])}
+ if(c.thirst>=60||(items.length&&Math.random()<.5))add((MENU_BY[c.preferredDrink]&&Math.random()<.6)?c.preferredDrink:pick(T.drinks),[]);
+ c.lastOrderT=S.time;if(!items.length){if(skipped)say(c,line('pricey'),10);return false}
+ c.order={id:++S.seq.order,items,t:S.time};c.state='WAITING_FOOD';
+ c.orderPatienceMax=Math.round(70*T.pat*CFG.PAT_ORDER*(S.upg&&S.upg.aircon?1.15:1));c.orderPatience=c.orderPatienceMax;
+ S.today.orders++;say(c,line('order'),8);fx.sfx('notify');return true}
+function assignPC(c,pc){
+ if(!c||(c.state!=='WAITING'&&c.state!=='ENTER'))return{ok:false,err:'err_cust'};
+ if(!pc||pc.status!=='AVAILABLE')return{ok:false,err:'err_pc_busy'};
+ if(c.balance<pc.hourlyRate/4)return{ok:false,err:'err_balance'};
+ pc.status='RESERVED';pc.currentCustomer=c.id;pc.sessionTime=0;c.pcId=pc.id;c.state='TO_PC';
+ const s=seatOf(pc);c.path=[{x:CFG.AISLE_X,y:c.y},{x:CFG.AISLE_X,y:s.y},{x:s.x,y:s.y}];
+ const diff=PC_TIERS[pc.tier].rank-PC_TIERS[c.preferredPC].rank;
+ if(diff<0){c.happiness-=(CT[c.type].strict?18:8)*-diff;say(c,line('low_tier'))}else c.happiness+=diff>0?4:6;
+ if(c.patience>c.patienceMax*.6)c.happiness+=4;
+ const u=S.upg||{};if(u.monitor)c.happiness+=CT[c.type].strict?10:6;if(u.chairs){c.happiness+=5;c.gamingTime=Math.round(c.gamingTime*1.2)}
+ c.happiness=clamp(c.happiness,0,100);return{ok:true}}
+
+/* ---------- nhân viên ---------- */
+function hireStaff(ty){const D=STAFF[ty];if(!D)return KE('err_generic');if(S.phase==='REPORT')return KE('err_report');
+ if(S.staff)return KE('err_staff_one');if(S.money<D.hire)return KE('err_money');
+ addTx(-D.hire,'STAFF_HIRE',t('tx_hire',{name:t('staff_'+ty)}));S.today.hire=(S.today.hire||0)+D.hire;
+ S.staff={type:ty,hand:null,t:0,st:null};S.today.staffDays=S.today.staffDays||{};S.today.staffDays[ty]=true;return KO('HIRE')}
+function fireStaff(){if(!S.staff)return KE('err_generic');S.staff=null;UI.sx=UI.sy=null;return KO('FIRE')}
+function buyUpgrade(id){const U=UPG_BY[id];if(!U)return KE('err_generic');S.upg=S.upg||{};if(S.upg[id])return KE('err_upg_owned');
+ if(S.phase==='REPORT')return KE('err_report');if(S.money<U.price)return KE('err_money');
+ addTx(-U.price,'UPGRADE',t('upg_'+id));S.today.upgrade=(S.today.upgrade||0)+U.price;S.upg[id]=true;applyUpgrades();return KO('UPGRADE')}
+function hasStockFor(r){const R=MENU_BY[r],h=id=>(S.inv[id]||0)>0;if(!R)return false;
+ if(R.type==='noodle')return h(R.base)&&h('to');if(R.type==='fried')return h(R.base)&&h('dia')&&h('tuong');
+ if(R.type==='mix'){const m=MIX[R.id];return h('ly')&&h(m.base)&&h(m.flavor)}return h(R.id)}
+function inferR(w){if(!w)return null;if(w.ws&&String(w.ws).startsWith('c:'))return String(w.ws).slice(2).split('|')[0];
+ switch(w.k){case'pack':case'bowl':case'pot':return NOODLE_R[w.b];case'raw':case'fry':case'fried':case'plate':return FRY_R[w.b];case'cup':return mixRecipe(w)}return null}
+function cookNeed(){const have={},add=r=>{if(r)have[r]=(have[r]||0)+1};
+ S.tray.forEach(d=>add(d.r));for(const st in S.k)S.k[st].forEach(w=>add(inferR(w)));add(inferR(S.hand));if(S.staff)add(inferR(S.staff.ph));
+ for(const c of S.customers)if(c.order)for(const it of c.order.items){if(it.done)continue;if(have[it.r]>0){have[it.r]--;continue}if(hasStockFor(it.r))return it}return null}
+function cookStep(){
+ const h=S.hand,full=S.tray.length>=CFG.TRAY_MAX,own=w=>!!(w&&w.ws&&String(w.ws).startsWith('c:'));
+ const ownR=w=>String(w.ws).slice(2).split('|')[0],ownTop=w=>(String(w.ws).split('|')[1]||'').split(',').filter(Boolean);
+ const go=(st,fn)=>{const r=fn();return r&&r.ok?{st}:null};
+ if(h){
+  if(h.k==='trash')return go('trash',kTrash);
+  if(h.k==='bowl'){const f=S.k.stove.indexOf(null);return f<0?null:go('stove',()=>kTap('stove',f))}
+  if(h.k==='raw'){const f=S.k.fryer.indexOf(null);return f<0?null:go('fryer',()=>kTap('fryer',f))}
+  if(h.k==='pack'||h.k==='fried'){const f=S.k.board.indexOf(null);if(f<0)return null;if(!h.ws)h.ws='c:'+(h.k==='pack'?NOODLE_R[h.b]:FRY_R[h.b])+'|';return go('board',()=>kTap('board',f))}
+  return null}
+ for(let i=0;i<S.k.stove.length;i++){const w=S.k.stove[i];if(!w)continue;const cs=cookState(w.t,COOK.noodle);if(cs==='ruined'||(cs!=='under'&&!full))return go('stove',()=>kTap('stove',i))}
+ for(let i=0;i<S.k.fryer.length;i++){const w=S.k.fryer[i];if(!w)continue;const cs=cookState(w.t,COOK.fried);if(cs==='ruined'||(cs!=='under'&&S.k.board.includes(null)))return go('fryer',()=>kTap('fryer',i))}
+ for(let i=0;i<S.k.bar.length;i++){const w=S.k.bar[i];if(!own(w))continue;
+  if(w.st==='done'){if(!full)return go('bar',()=>kTap('bar',i));continue}
+  if(w.st==='open'){const m=MIX[ownR(w)];if(!m)continue;S.sel.bar=i;
+   if(!w.ice)return go('bar',()=>kBin('bar','da'));if(!w.base)return go('bar',()=>kBin('bar',m.base));if(!w.flavor)return go('bar',()=>kBin('bar',m.flavor));return go('bar',()=>kTap('bar',i))}}
+ for(let i=0;i<S.k.board.length;i++){const w=S.k.board[i];if(!own(w))continue;S.sel.board=i;
+  if(w.k==='plate'){if(!w.sauce)return go('board',()=>kBin('board','tuong'));if(!full)return go('board',()=>kTap('board',i));continue}
+  if(w.st==='pack'||w.st==='open')return go('board',()=>kTap('board',i));
+  if(w.st==='bowl'){for(const x of ownTop(w))if(!w.top.includes(x)&&(S.inv[x]||0)>0)return go('board',()=>kBin('board',x));return go('board',()=>kTap('board',i))}
+  if(w.st==='seasoned'&&S.k.stove.includes(null))return go('board',()=>kTap('board',i))}
+ const n=cookNeed();if(!n)return null;const R=MENU_BY[n.r],ws='c:'+R.id+'|'+(n.top||[]).join(',');
+ if(R.type==='bottle')return full?null:go('fridge',()=>kBin('fridge',R.id));
+ if(R.type==='noodle'){if(!S.k.board.includes(null))return null;return go('noodlebox',()=>{const r=kBin('noodlebox',R.base);if(r.ok)S.hand.ws=ws;return r})}
+ if(R.type==='fried'){if(!S.k.fryer.includes(null))return null;return go('freezer',()=>{const r=kBin('freezer',R.base);if(r.ok)S.hand.ws=ws;return r})}
+ if(R.type==='mix'){const f=S.k.bar.indexOf(null);if(f<0)return null;return go('bar',()=>{const r=placeCup(f);if(r.ok)S.k.bar[f].ws=ws;return r})}
+ return null}
+function cookAct(){const sf=S.staff,ph=S.hand;S.hand=sf.hand||null;sf.ph=ph;let r=null;
+ try{r=cookStep()}finally{sf.hand=S.hand;S.hand=ph;delete sf.ph}if(r)sf.st=r.st;return r}
+function cashierStep(){const cash=c=>Math.floor(cashFree(c)/10000)*10000;
+ const rc=S.customers.find(c=>isSeated(c)&&(c.rechargeReq||c.state==='RECHARGE'));
+ if(rc){const a=Math.min(rc.rechargeReq||10000,cash(rc));if(a>0&&recharge(rc,a).ok)return true}
+ const c=S.customers.find(x=>x.state==='WAITING'&&x.id!==SERVING);if(!c)return false;
+ const free=S.pcs.filter(p=>p.status==='AVAILABLE');if(!free.length)return false;
+ const pc=free.find(p=>p.tier===c.preferredPC)||free[0];
+ if(c.balance<pc.hourlyRate/4){const a=Math.min(Math.max(c.askAmt||0,10000),cash(c));if(a>0)recharge(c,a)}
+ return assignPC(c,pc).ok}
+function staffTick(dt){const sf=S.staff;if(!sf||(S.phase!=='OPEN'&&S.phase!=='CLOSING'))return;const D=STAFF[sf.type];sf.t=(sf.t||0)+dt;
+ let g=0;while(sf.t>=D.every&&g++<5){sf.t-=D.every;if(sf.type==='cook')cookAct();else cashierStep()}}
+function stationTick(dt){
+ applyUpgrades();const u=S.upg||{};
+ for(const[,p,auto]of[['stove',COOK.noodle,u.stove_auto],['fryer',COOK.fried,u.fryer_auto]])for(const w of S.k[p===COOK.noodle?'stove':'fryer'])if(w){
+  const a=cookState(w.t,p);w.t+=dt;if(auto&&(a==='under'||a==='perfect'))w.t=Math.min(w.t,p.T+p.ok*.5);
+  const b=cookState(w.t,p);if(a!==b){if(b==='perfect')fx.sfx('ding');else if(b==='ruined')fx.sfx('error')}}
+ for(const w of S.k.bar)if(w&&w.st==='shaking'){w.t+=dt;if(w.t>=COOK.shake){w.st='done';fx.sfx('ding')}}
+ staffTick(dt)}
+
+/* ---------- cuối ngày / ngày mới ---------- */
+function endDay(){
+ if(S.phase==='REPORT')return S.report;
+ const d=S.today,u=S.upg||{},elec=CFG.ELEC_BASE+(u.aircon?20000:0)+Math.round(d.pcMinutes/60*CFG.ELEC_PC_HOUR);
+ addTx(-elec,'ELECTRICITY',t('exp_elec'));addTx(-CFG.INTERNET,'INTERNET',t('exp_net'));addTx(-CFG.MAINT,'REPAIR',t('exp_maint'));
+ let salary=0;for(const ty in(d.staffDays||{})){const s=STAFF[ty].salary;salary+=s;addTx(-s,'STAFF_SALARY',t('tx_salary',{name:t('staff_'+ty)}))}
+ const rev={recharge:d.recharge,food:d.food,drink:d.drink},revenue=d.recharge+d.food+d.drink;
+ const exp={purchases:d.purchases,elec,internet:CFG.INTERNET,maint:CFG.MAINT,salary,hire:d.hire||0,upgrade:d.upgrade||0};
+ const expense=exp.purchases+exp.elec+exp.internet+exp.maint+exp.salary+exp.hire+exp.upgrade;
+ S.report={day:S.day,rev,revenue,exp,expense,profit:revenue-expense,pcUsage:Math.round(d.pcUsage),pcHours:d.pcMinutes/60,visitors:d.visitors,served:d.served,left:d.left,orders:d.orders,failed:d.ordersFailed,sat:d.happyN?Math.round(d.happySum/d.happyN):0,sold:{...d.sold}};
+ S.history.push({day:S.day,revenue,expense,profit:revenue-expense});if(S.history.length>60)S.history.shift();
+ S.phase='REPORT';S.k=emptyKitchen();S.hand=null;S.sel={};S.tray=[];if(S.staff)S.staff.hand=null;return S.report}
+function nextDay(){
+ if(S.phase!=='REPORT')return false;if(S.day===1)S.tutorialDone=true;
+ S.day++;S.time=CFG.OPEN-30;S.phase='PREP';S.today=freshToday(S.money);S.tx=[];S.report=null;S.customers=[];
+ S.pcs.forEach(p=>{p.status='AVAILABLE';p.currentCustomer=null;p.sessionTime=0});
+ S.today.staffDays=S.staff?{[S.staff.type]:true}:{};expireLots();return true}
+
+/* ---------- hướng dẫn + bàn thao tác ---------- */
+function chainTut(st){if(S.settings.coach===false)return null;let c={noodlebox:'noodle',stove:'noodle',freezer:'fried',fryer:'fried',bar:'mix'}[st]||null;
+ if(st==='board')c=(S.hand&&S.hand.k==='fried')||S.k.board.some(w=>w&&w.k==='plate')?'fried':'noodle';
+ return c&&!(S.tutSeen||{})[c]?c:null}
+function coachTarget(){const h=S.hand;if(h)return{pack:'board',raw:'fryer',bowl:'stove',fried:'board',trash:'trash'}[h.k]||null;
+ for(const st of['stove','fryer'])for(const w of S.k[st])if(w&&cookState(w.t,st==='stove'?COOK.noodle:COOK.fried)!=='under')return st;
+ if(S.k.board.some(w=>w&&!(w.k==='bowl'&&w.st==='seasoned'&&!S.k.stove.includes(null))))return'board';
+ if(S.k.bar.some(w=>w&&w.st!=='shaking'))return'bar';
+ if(trayMatches())return null;const n=firstNeed();
+ return n&&MENU_BY[n.r]?{noodle:'noodlebox',fried:'freezer',mix:'bar',bottle:'fridge'}[MENU_BY[n.r].type]:null}
+function needsList(types){const pool=S.tray.slice(),m={};
+ for(const c of S.customers)if(c.order)for(const it of c.order.items){if(it.done)continue;const j=pool.findIndex(d=>d.r===it.r);if(j>=0){pool.splice(j,1);continue}
+  const R=MENU_BY[it.r];if(!R||!types.includes(R.type))continue;const k=it.r+'|'+(it.top||[]).join(',');(m[k]=m[k]||{it,n:0}).n++}
+ return Object.values(m)}
+function binNeed(st,id,list){let n=0;for(const{it,n:q}of list){const R=MENU_BY[it.r];
+ if(st==='noodlebox'&&R.type==='noodle'&&R.base===id)n+=q;else if(st==='freezer'&&R.type==='fried'&&R.base===id)n+=q;else if(st==='fridge'&&R.id===id)n+=q;
+ else if(st==='board'&&R.type==='noodle'&&(it.top||[]).includes(id))n+=q;else if(st==='board'&&id==='tuong'&&R.type==='fried')n+=q;
+ else if(st==='bar'&&R.type==='mix'){const mx=MIX[R.id];if(id===mx.base||id===mx.flavor||id==='ly'||id==='da')n+=q}}return n}
+function renderKBar(){
+ const kb=$('kbar');if(!kb)return;
+ const st=(!UI.walk&&UI.at&&(S.phase==='OPEN'||S.phase==='CLOSING'))?UI.at:null;
+ if(!st){if(kb._k!==''){kb._k='';kb.style.display='none';document.body.classList.remove('kb')}return}
+ const K=KIT[st],chain=CHAIN[st]||[],need=needsList(chain),tut=chainTut(st);
+ const parts=[st,JSON.stringify(S.hand),S.sel[st],S.tray.length,CFG.TRAY_MAX,COOK.noodle.T,COOK.fried.T,tut,need.map(x=>x.it.r+(x.it.top||[]).join('')+x.n).join(',')];
+ if(S.k[st])S.k[st].forEach((w,i)=>parts.push(w?[w.k,w.st,w.b,(w.top||[]).join(''),w.sauce,w.ice,w.base,w.flavor].join('.')+spotInfo(st,i).join('/'):'_'));
+ (K.bins||[]).forEach(b=>parts.push(S.inv[b[0]]));
+ const key=parts.join('#');
+ if(kb._k!==key){kb._k=key;kb.style.display='flex';document.body.classList.add('kb');
+  let h=`<div class="kbt"><b>${t(K.name)}</b><span class="muted">${t('kb_hand')}: ${S.hand?esc(wiName(S.hand)):'—'}</span><span class="muted">${t('tray_lbl')}: ${S.tray.length}/${CFG.TRAY_MAX}</span><button class="kx" data-kx="close" aria-label="${t('close')}">✕</button></div>`;
+  if(tut)h+=`<div class="tutc"><b>${t('tut_t_'+tut)}</b>${t('tut_'+tut).map(s=>`<div>${esc(s)}</div>`).join('')}<button class="sm pri" data-kx="tut:${tut}">${t('tut_ok')}</button></div>`;
+  if(chain.length)h+=`<div class="kneed"><span class="muted">${t('kb_need')}:</span>${need.length?need.map(x=>`<span class="pill">${wiSVG({k:'dish',r:x.it.r,top:x.it.top},20)} ${esc(dishLabel(x.it))} <b>×${x.n}</b></span>`).join(''):`<span class="muted">${t('kb_none')}</span>`}</div>`;
+  h+='<div class="kbs">';
+  if(st==='trash')h+=`<button data-kb="trash::">🗑<span>${t('kb_trash')}</span></button>`;
+  if(S.k[st])S.k[st].forEach((w,i)=>{const[a,s]=spotInfo(st,i),sel=!!(w&&(st==='board'||st==='bar')&&S.sel[st]===i);
+   const p=w&&(st==='stove'?COOK.noodle:st==='fryer'?COOK.fried:null),tot=p?p.T+p.ruin:1;
+   const bar=p?`<div class="kpb" data-p="${st}:${i}"><i class="zp" style="left:${p.T/tot*100}%;width:${p.ok/tot*100}%"></i><i class="zo" style="left:${(p.T+p.ok)/tot*100}%;width:${(p.ruin-p.ok)/tot*100}%"></i><b></b></div>`:'';
+   h+=`<div class="kbw"><button data-kb="spot:${st}:${i}" class="${sel?'sel':''}">${w?wiSVG(w,30):'<span class="slotnum">'+(i+1)+'</span>'}<span>${esc(a)}</span>${s?`<small>${esc(s)}</small>`:''}${bar}</button>${w&&(st==='board'||st==='bar')?`<button class="mini" data-kb="del:${st}:${i}" aria-label="${t('kb_discard')}">✕</button>`:''}</div>`});
+  (K.bins||[]).forEach(([id])=>{const n=id==='da'?'∞':(S.inv[id]||0),q=binNeed(st,id,need),held=!!(S.hand&&S.hand.b===id&&(st==='noodlebox'||st==='freezer'));
+   h+=`<button data-kb="bin:${st}:${id}" class="${n===0?'out':''} ${held?'sel':''}">${binSVG(st,id,26)}<span>${esc(binName(st,id))}</span><small>${held?t('kb_return'):n}</small>${q?`<em class="cnt">${q}</em>`:''}</button>`});
+  kb.innerHTML=h+'</div>'}
+ kb.querySelectorAll('.kpb').forEach(el=>{const[s,i]=el.dataset.p.split(':'),w=S.k[s][+i],p=s==='stove'?COOK.noodle:COOK.fried,b=el.querySelector('b');if(w&&b)b.style.left=Math.min(100,w.t/(p.T+p.ruin)*100)+'%'})}
+function renderStaff(){
+ let el=$('staffEl');const sf=S.staff;if(!sf){if(el)el.style.display='none';return}
+ if(!el){el=document.createElement('div');el.id='staffEl';el.className='ent player staffch';el.innerHTML='<div class="spr"></div><span class="ptag"></span><div class="hand"></div>';$('world').appendChild(el)}
+ if(el._k!==sf.type){el._k=sf.type;el.firstChild.innerHTML=charSVG(STAFF_LOOK[sf.type],{apron:1});el.querySelector('.ptag').textContent=t('staff_'+sf.type)}
+ const K=KIT[sf.st],tx=sf.type==='cashier'?84:(K?K.x+K.w/2:540),ty=sf.type==='cashier'?232:KIT_SPOT_Y+8;
+ UI.sx=UI.sx==null?tx:UI.sx+(tx-UI.sx)*.15;UI.sy=UI.sy==null?ty:UI.sy+(ty-UI.sy)*.15;
+ el.style.display='block';el.style.transform=`translate(${UI.sx-20}px,${UI.sy-52}px)`;el.style.zIndex=Math.round(UI.sy)+1;
+ const he=el.querySelector('.hand'),hk=sf.hand?JSON.stringify(sf.hand):'';if(he._k!==hk){he._k=hk;he.innerHTML=sf.hand?wiSVG(sf.hand,24):'';he.style.display=sf.hand?'block':'none'}}
+function renderCoach(now){if(now-(UI.coachT||0)<250)return;UI.coachT=now;
+ const on=S.settings.coach!==false&&(S.phase==='OPEN'||S.phase==='CLOSING'),tg=on?coachTarget():null;
+ if(UI.coachK!==tg){document.querySelectorAll('[data-act="kst"].coach').forEach(e=>e.classList.remove('coach'));
+  if(tg){const e=document.querySelector(`[data-act="kst"][data-id="${tg}"]`);if(e)e.classList.add('coach')}UI.coachK=tg}
+ const u=S.upg||{};for(const[st,id]of[['stove','stove_auto'],['fryer','fryer_auto']]){const e=document.querySelector(`[data-act="kst"][data-id="${st}"]`);if(!e)continue;
+  let b=e.querySelector('.autob');if(u[id]&&!b){b=document.createElement('div');b.className='autob';b.textContent='AUTO';e.appendChild(b)}else if(!u[id]&&b)b.remove()}}
+function frame(now){
+ const dt=Math.min(.1,(now-last)/1000||0);last=now;applyUpgrades();
+ if(!S.paused&&(S.phase==='OPEN'||S.phase==='CLOSING')){let m=dt*CFG.MIN_PER_SEC*S.speed;while(m>1e-6){const d=Math.min(1,m);stepSim(d);m-=d}}
+ if(!S.paused)movePlayer(dt);
+ renderTop();renderPCs();renderKitchen(now);renderCustomers();renderPlayer();renderTray();renderKBar();renderStaff();renderCoach(now);
+ if(now-UI.hintT>400){UI.hintT=now;setT($('hintTx'),hintText())}
+ if(UI.sheet&&!UI.ptr&&now-UI.refreshT>1000){UI.refreshT=now;if(['counter','cust','pc','pcs','orders'].includes(UI.sheet.kind))renderSheet()}
+ if(S.phase==='REPORT'&&(!UI.sheet||UI.sheet.kind!=='report'))openSheet('report');
+ if(S.phase==='PREP'&&!UI.sheet&&!UI.prepShown){UI.prepShown=true;openSheet('prep')}
+ requestAnimationFrame(frame)}
+
+/* ---------- các bảng ---------- */
+const L3=(l,v,neg)=>`<div class="row"><span>${l}</span><b class="${neg?'badc':'okc'}">${neg?'-':'+'}${vnd(v)}</b></div>`;
+BUILD.staff=function(){return`<h3>${t('staff_t')} <span class="muted">· ${vnd(S.money)}</span></h3><p class="muted">${t('staff_note')}</p>${Object.keys(STAFF).map(ty=>{const D=STAFF[ty],on=!!(S.staff&&S.staff.type===ty);
+ return`<div class="scard ${on?'on':''}">${charSVG(STAFF_LOOK[ty],{apron:1,s:.9})}<div class="grow"><b>${t('staff_'+ty)}</b> ${on?`<span class="badge ok">${t('staff_working')}</span>`:''}<p class="muted" style="margin:4px 0">${t('staffd_'+ty)}</p><small class="muted">${t('staff_fee',{fee:vnd(D.hire),sal:vnd(D.salary)})}</small><div style="margin-top:6px">${on?`<button class="sm danger" data-ui="fire">${t('staff_fire')}</button>`:`<button class="sm pri" data-ui="hire" data-a="${ty}">${t('staff_hire')} · ${vk(D.hire)}</button>`}</div></div></div>`}).join('')}`};
+BUILD.upg=function(){const u=S.upg||{},g=grp=>UPGRADES.filter(x=>x.grp===grp).map(x=>`<div class="scard ${u[x.id]?'on':''}"><div class="grow"><b>${t('upg_'+x.id)}</b><p class="muted" style="margin:4px 0">${t('upgd_'+x.id)}</p>${u[x.id]?`<span class="badge ok">${t('upg_owned')}</span>`:`<button class="sm pri" data-ui="upg" data-a="${x.id}">${t('upg_buy')} · ${vk(x.price)}</button>`}</div></div>`).join('');
+ return`<h3>${t('upg_t')} <span class="muted">· ${vnd(S.money)}</span></h3><h4>${t('upg_kitchen')}</h4>${g('kitchen')}<h4>${t('upg_room')}</h4>${g('room')}`};
+BUILD.orders=function(){const cs=S.customers.filter(c=>c.order);
+ const prow=m=>{const p=priceOf(m.id),cost=recipeCost(m.id),mg=p?Math.round((p-cost)/p*100):0,chg=p!==m.price;
+  return`<div class="prow">${wiSVG({k:'dish',r:m.id,top:[]},24)}<div class="grow"><b>${esc(menuName(m.id))}</b><small class="muted">${t('cost_short')} ${vk(cost)} · ${t('margin')} ${mg}%${chg?` · ${t('base_price')} ${vk(m.price)}`:''}</small></div><button class="sm" data-ui="price" data-a="${m.id}|-1000" aria-label="Giảm giá">−</button><b class="pv ${chg?(p>m.price?'warnc':'okc'):''}">${vk(p)}</b><button class="sm" data-ui="price" data-a="${m.id}|1000" aria-label="Tăng giá">+</button>${chg?`<button class="sm" data-ui="priceReset" data-a="${m.id}" aria-label="Giá gốc">↺</button>`:''}</div>`};
+ return`<h3>${t('orders_t')}</h3>${cs.length?cs.map(c=>`<div class="card"><div class="row"><b>${esc(c.name)} · PC #${pad(c.pcId)}</b><span class="muted">⏱ ${Math.max(0,Math.ceil(c.orderPatience))}′</span></div><div>${c.order.items.map(it=>`<span class="pill ${it.done?'done':''}">${wiSVG({k:'dish',r:it.r,top:it.top},20)} ${esc(dishLabel(it))}</span>`).join('')}</div></div>`).join(''):`<p class="muted">${t('none_needed')}</p>`}
+ <h4>${t('price_t')}</h4><p class="muted">${t('price_note')}</p>${MENU.map(prow).join('')}
+ <h4>${t('toppings_t')}</h4>${TOP_IDS.map(x=>`<div class="mrow">${binSVG('board',x,20)}<span>${t('bin_'+x)}</span><b>+${vk(TOPPINGS[x].price)}</b><small></small></div>`).join('')}
+ <h4>${t('guide_t')}</h4>${['noodle','fried','mix','bottle'].map(k=>`<p class="muted">${t('guide_'+k)}</p>`).join('')}<button class="wide" data-ui="tutReset">${t('tut_again')}</button>`};
+BUILD.inv=function(){const cats=[...new Set(ITEMS.map(i=>i.cat))];for(const id in SHELF)syncLots(id);
+ return`<h3>${t('nav_inv')} <span class="muted">· ${vnd(S.money)}</span></h3>${ITEMS.every(i=>!S.inv[i.id])?emptyBox('inv'):''}${cats.map(cat=>`<h4>${cat}</h4>`+ITEMS.filter(i=>i.cat===cat).map(it=>{const st=S.inv[it.id],lots=SHELF[it.id]?(S.lots[it.id]||[]):[],soon=lots.filter(l=>l.exp<=S.day).reduce((a,l)=>a+l.n,0);
+  const lt=SHELF[it.id]?`<div class="muted">${t('shelf_life',{d:SHELF[it.id]})}${lots.length?' · '+lots.map(l=>`${l.n}: ${l.exp<=S.day?t('exp_today'):t('exp_in',{d:l.exp-S.day})}`).join(' · '):''}</div>`:'';
+  return`<div class="item"><div class="grow"><b>${esc(itemName(it.id))}</b> ${st<it.min?`<span class="badge warn">${t('low')}</span>`:''}${soon?` <span class="badge bad">${t('exp_warn',{n:soon})}</span>`:''}<div class="muted">${t('stock')}: <b>${st}</b> ${it.unit} · ${t('cost')} ${vnd(it.cost)}</div>${lt}</div><button class="sm" data-ui="buy" data-a="${it.id}|${it.pack}">+${it.pack}<small>${vk(it.cost*it.pack)}</small></button><button class="sm" data-ui="buy" data-a="${it.id}|${it.pack*3}">+${it.pack*3}<small>${vk(it.cost*it.pack*3)}</small></button></div>`}).join('')).join('')}`};
+BUILD.prep=function(){const f=forecast(),low=ITEMS.filter(i=>S.inv[i.id]<i.min),ex=S.today.expired||{},exK=Object.keys(ex);
+ return`<h3>${t('forecast')} · ${t('weekday')[S.day%7]} ${isWeekend(S.day)?`<span class="badge acc">${t('weekend')}</span>`:''}</h3>
+ <div class="stats">${stat(t('fc_customers'),f.cust.join('–'))}${stat(t('fc_noodle'),f.noodle.join('–'))}${stat(t('fc_fried'),f.fried.join('–'))}${stat(t('fc_drink'),f.drink.join('–'))}</div>
+ ${exK.length?`<p class="badc">${esc(t('expired_line',{items:exK.map(k=>itemName(k)+' ×'+ex[k]).join(', '),v:vnd(exK.reduce((a,k)=>a+ex[k]*ITEM_BY[k].cost,0))}))}</p>`:''}
+ ${S.staff?`<p class="muted">${t('staff_today',{name:t('staff_'+S.staff.type),s:vnd(STAFF[S.staff.type].salary)})}</p>`:''}
+ <p class="${low.length?'warnc':'okc'}">${low.length?esc(t('stock_warn',{items:low.map(i=>itemName(i.id)).join(', ')})):t('stock_ok')}</p>
+ <div class="btns"><button data-ui="inv">${t('go_inv')}</button><button data-ui="go" data-a="staff">👥 ${t('nav_staff')}</button><button data-ui="go" data-a="upg">🔧 ${t('nav_upg')}</button></div>
+ <button class="pri wide" data-ui="open">${t('open_btn')}</button>`};
+BUILD.report=function(){const r=S.report;if(!r)return null;const x=r.exp;
+ return`<h2 class="center">${t('report_t',{d:r.day})}</h2>
+ <div class="card"><h4>${t('revenue')}</h4>${L3(t('r_recharge'),r.rev.recharge)}${L3(t('r_food'),r.rev.food)}${L3(t('r_drink'),r.rev.drink)}<div class="row total"><span>${t('total')}</span><b>${vnd(r.revenue)}</b></div><p class="muted">${t('pc_usage_note',{h:r.pcHours.toFixed(1),v:vnd(r.pcUsage)})}</p></div>
+ <div class="card"><h4>${t('expense')}</h4>${L3(t('e_buy'),x.purchases,1)}${L3(t('exp_elec'),x.elec,1)}${L3(t('exp_net'),x.internet,1)}${L3(t('exp_maint'),x.maint,1)}${x.salary?L3(t('e_salary'),x.salary,1):''}${x.hire?L3(t('e_hire'),x.hire,1):''}${x.upgrade?L3(t('e_upgrade'),x.upgrade,1):''}<div class="row total"><span>${t('total')}</span><b>${vnd(r.expense)}</b></div></div>
+ <div class="card profit ${r.profit>=0?'pos':'neg'}"><h4>${t('profit')}</h4><div class="big">${r.profit>=0?'+':''}${vnd(r.profit)}</div></div>
+ <div class="stats">${stat(t('visitors'),r.visitors)}${stat(t('served'),r.served)}${stat(t('left'),r.left)}${stat(t('sat'),r.sat+'%')}</div>
+ <button class="pri wide" data-ui="next">${t('next')}</button>`};
+BUILD.set=function(){return`<h3>${t('nav_set')}</h3>${rowKV(t('sound'),`<button class="sm" data-ui="sound">${S.settings.sound?t('on'):t('off')}</button>`)}${rowKV(t('coach'),`<button class="sm" data-ui="coach">${S.settings.coach!==false?t('on'):t('off')}</button>`)}${rowKV(t('language'),'Tiếng Việt')}
+ <div class="btns col"><button data-ui="tutReset">${t('tut_again')}</button><button data-ui="save">${t('save_now')}</button><button class="ok" data-ui="test">${t('run_test')}</button><button class="danger" data-ui="reset">${t('reset')}</button></div><p class="muted">${t('save_note')}</p>`};
+Object.assign(ACT,{
+ go:a=>openSheet(a),
+ hire:a=>{const r=hireStaff(a);if(!r.ok){fx.err(r.err,r.v);return}fx.sfx('cash');fx.toast(t('toast_hired',{name:t('staff_'+a)}),'ok');saveGame();renderSheet()},
+ fire:()=>{if(fireStaff().ok){fx.toast(t('toast_fired'));saveGame()}renderSheet()},
+ upg:a=>{const r=buyUpgrade(a);if(!r.ok){fx.err(r.err,r.v);return}fx.sfx('cash');fx.toast(t('toast_upg',{name:t('upg_'+a)}),'ok');saveGame();renderSheet()},
+ price:a=>{const[r,d]=a.split('|'),res=setPrice(r,priceOf(r)+(+d));if(!res.ok){fx.err(res.err,res.v);return}UI.sheetHtml='';renderSheet()},
+ priceReset:a=>{if(S.prices)delete S.prices[a];UI.sheetHtml='';renderSheet()},
+ coach:()=>{S.settings.coach=S.settings.coach===false;renderSheet()},
+ tutReset:()=>{S.tutSeen={};S.settings.coach=true;fx.toast(t('toast_tut_reset'),'ok');renderSheet()}});
+
+/* ---------- nút mới + bấm ra ngoài để đóng bàn thao tác ---------- */
+(function(){const bar=$('bar'),set=bar&&bar.querySelector('[data-nav="set"]');if(!set)return;
+ const mk=(nav,ic,key)=>{const b=document.createElement('button');b.dataset.nav=nav;b.innerHTML=`<span>${ic}</span><span>${t(key)}</span>`;bar.insertBefore(b,set)};
+ mk('staff','👥','nav_staff');mk('upg','🔧','nav_upg')})();
+document.addEventListener('click',e=>{if(!S||!UI.at)return;const kb=$('kbar');if(kb&&kb.contains(e.target))return;
+ if(e.target.closest&&e.target.closest('[data-act="kst"],[data-act="spot"],[data-act="bin"]'))return;UI.at=null},true);
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-kx]');if(!b||!S)return;const v=b.dataset.kx;
+ if(v==='close')UI.at=null;else if(v.startsWith('tut:')){S.tutSeen=S.tutSeen||{};S.tutSeen[v.slice(4)]=true;saveGame()}});
  init();
 </script>
 </body>
