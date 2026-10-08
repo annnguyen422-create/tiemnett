@@ -1966,8 +1966,7 @@ function runTestsP3(){
  const until=(fn,max)=>{for(let i=0;i<(max||600)&&!fn();i++)stepSim(1);return!!fn()};
  const okr=r=>!!(r&&r.ok);
  try{
-  S=newState();applyUpgrades();openShop();S.time=18*60;
-  /* kiên nhẫn */
+  S=newState();S.money=S.today.startMoney=20000000;applyUpgrades();openShop();S.time=18*60;  /* kiên nhẫn */
   const c=spawnCustomer({type:'sinhvien'});
   ok('K1. Khách chờ ở quầy lâu hơn (×1,6)',c.patienceMax===Math.round(50*CT.sinhvien.pat*1.6),`${c.patienceMax} phút game`);
   c.hunger=100;c.thirst=0;maybeOrder(c,true);const op=c.orderPatienceMax;c.order=null;c.state='ENTER';
