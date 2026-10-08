@@ -1959,6 +1959,89 @@ document.addEventListener('click',e=>{if(!S||!UI.at)return;const kb=$('kbar');if
  if(e.target.closest&&e.target.closest('[data-act="kst"],[data-act="spot"],[data-act="bin"]'))return;UI.at=null},true);
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-kx]');if(!b||!S)return;const v=b.dataset.kx;
  if(v==='close')UI.at=null;else if(v.startsWith('tut:')){S.tutSeen=S.tutSeen||{};S.tutSeen[v.slice(4)]=true;saveGame()}});
+ /* ================= PHASE 3 — SELF TEST ================= */
+function runTestsP3(){
+ const R=[],ok=(n,c,info)=>R.push({n,pass:!!c,info:info||''});
+ const saved=S,sv=SERVING;TEST=true;NOSPAWN=true;SERVING=null;
+ const until=(fn,max)=>{for(let i=0;i<(max||600)&&!fn();i++)stepSim(1);return!!fn()};
+ const okr=r=>!!(r&&r.ok);
+ try{
+  S=newState();applyUpgrades();openShop();S.time=18*60;
+  /* kiên nhẫn */
+  const c=spawnCustomer({type:'sinhvien'});
+  ok('K1. Khách chờ ở quầy lâu hơn (×1,6)',c.patienceMax===Math.round(50*CT.sinhvien.pat*1.6),`${c.patienceMax} phút game`);
+  c.hunger=100;c.thirst=0;maybeOrder(c,true);const op=c.orderPatienceMax;c.order=null;c.state='ENTER';
+  ok('K2. Khách chờ món lâu hơn (×1,5)',op===Math.round(70*CT.sinhvien.pat*1.5),`${op} phút game`);
+  /* đổi / trả nguyên liệu */
+  const i0={...S.inv};
+  ok('Đ1. Đang cầm Mì bò, bấm Mì gà → đổi loại, Mì bò về kho',okr(kBin('noodlebox','mi_bo'))&&okr(kBin('noodlebox','mi_ga'))&&S.hand.b==='mi_ga'&&S.inv.mi_bo===i0.mi_bo&&S.inv.mi_ga===i0.mi_ga-1);
+  ok('Đ2. Bấm lại đúng loại đang cầm → trả về kho, tay trống',okr(kBin('noodlebox','mi_ga'))&&!S.hand&&S.inv.mi_ga===i0.mi_ga);
+  ok('Đ3. Đổi đồ chiên ở Tủ đông, trả lại được',okr(kBin('freezer','cavien'))&&okr(kBin('freezer','tomvien'))&&S.hand.b==='tomvien'&&S.inv.cavien===i0.cavien&&okr(kBin('freezer','tomvien'))&&!S.hand&&S.inv.tomvien===i0.tomvien);
+  ok('Đ4. Đang cầm gói mì thì không lấy đồ chiên được',okr(kBin('noodlebox','mi'))&&!kBin('freezer','cavien').ok&&okr(kBin('noodlebox','mi'))&&!S.hand);
+  /* hạn dùng */
+  S.inv.cavien=10;S.lots={cavien:[{n:4,exp:S.day},{n:6,exp:S.day+3}]};
+  const tk=takeStock('cavien');
+  ok('H1. Lấy hàng lô cũ trước (FIFO)',!!tk&&tk.exp===S.day&&S.lots.cavien[0].n===3&&S.inv.cavien===9);
+  returnStock('cavien',tk.exp);
+  ok('H2. Trả lại kho giữ đúng hạn dùng cũ',S.lots.cavien.filter(l=>l.exp===S.day).reduce((a,l)=>a+l.n,0)===4&&S.inv.cavien===10);
+  const tb=S.inv.tomvien,rb=buyStock('tomvien',5);
+  ok('H3. Hàng mới mua có hạn dùng theo loại',rb.ok&&S.inv.tomvien===tb+5&&S.lots.tomvien.some(l=>l.n===5&&l.exp===S.day+SHELF.tomvien));
+  S.time=CFG.CLOSE-1;until(()=>S.phase==='REPORT',300);
+  const cb=S.inv.cavien;nextDay();
+  ok('H4. Sang ngày mới → tự bỏ 4 phần cá viên hết hạn',S.inv.cavien===cb-4&&!!S.today.expired&&S.today.expired.cavien===4&&S.lots.cavien.every(l=>l.exp>=S.day),`còn ${S.inv.cavien}`);
+  /* đổi giá */
+  openShop();S.time=18*60;
+  ok('G1. Tăng giá Mì bò lên 18k (topping vẫn cộng thêm)',okr(setPrice('mi_bo',18000))&&priceOf('mi_bo')===18000&&itemPrice({r:'mi_bo',top:['trung']})===23000);
+  ok('G2. Không cho đặt giá ngoài khoảng 50%–200%',!setPrice('mi_bo',3000).ok&&!setPrice('mi_bo',100000).ok&&priceOf('mi_bo')===18000);
+  const c3=spawnCustomer({type:'sinhvien'});c3.money=300000;c3.balance=100000;c3.gamingTime=99999;
+  ok('G3a. (chuẩn bị) khách ngồi máy',until(()=>c3.state==='WAITING')&&assignPC(c3,S.pcs.find(p=>p.status==='AVAILABLE')).ok&&until(()=>c3.state==='PLAYING'));
+  c3.order={id:++S.seq.order,items:[{r:'mi_bo',top:[],done:false}],t:S.time};c3.state='WAITING_FOOD';c3.orderPatience=c3.orderPatienceMax=900;
+  S.tray=[{r:'mi_bo',top:[],q:100}];const mb=S.money;deliverTo(c3);
+  ok('G3. Khách trả theo giá mới',S.money===mb+18000);
+  ok('G4. Đặt lại giá gốc',okr(setPrice('mi_bo',14000))&&priceOf('mi_bo')===14000&&!('mi_bo' in S.prices));
+  /* nhân viên */
+  const m0=S.money;
+  ok('N1. Thuê đầu bếp → trừ phí tuyển',okr(hireStaff('cook'))&&S.money===m0-STAFF.cook.hire&&S.staff.type==='cook'&&S.tx.some(x=>x.type==='STAFF_HIRE'));
+  ok('N2. Chỉ thuê được 1 người',hireStaff('cashier').err==='err_staff_one');
+  S.k=emptyKitchen();S.tray=[];S.hand=null;
+  c3.state='WAITING_FOOD';c3.order={id:++S.seq.order,items:[{r:'mi_cay',top:['trung'],done:false},{r:'cavien',top:[],done:false},{r:'tra_dao',top:[],done:false},{r:'water',top:[],done:false}],t:S.time};c3.orderPatience=c3.orderPatienceMax=900;
+  const want=['mi_cay','cavien','tra_dao','water'],made=until(()=>want.every(r=>S.tray.some(d=>d.r===r)),200);
+  ok('N3. Đầu bếp tự làm đủ 4 món theo đơn (mì có topping, chiên, pha, nước chai)',made&&S.tray.some(d=>d.r==='mi_cay'&&d.top.includes('trung')),S.tray.map(d=>d.r).join(', '));
+  ok('N4. Đầu bếp không đụng vào tay người chơi',!S.hand);
+  deliverTo(c3);
+  ok('N5. Cho đầu bếp nghỉ',okr(fireStaff())&&!S.staff);
+  ok('N6. Thuê thu ngân sau khi cho đầu bếp nghỉ',okr(hireStaff('cashier'))&&S.staff.type==='cashier');
+  const c4=spawnCustomer({type:'gamethu'});c4.money=300000;
+  ok('N7. Thu ngân tự nạp tiền và xếp máy',until(()=>c4.state==='TO_PC'||c4.state==='PLAYING',60)&&c4.balance>0&&!!c4.pcId);
+  /* nâng cấp */
+  const mu=S.money;
+  ok('U1. Mua chảo tự ngắt → trừ tiền',okr(buyUpgrade('fryer_auto'))&&S.money===mu-UPG_BY.fryer_auto.price&&!!S.upg.fryer_auto);
+  ok('U2. Không mua trùng',buyUpgrade('fryer_auto').err==='err_upg_owned');
+  S.k=emptyKitchen();S.hand=null;kBin('freezer','cavien');kTap('fryer',0);until(()=>false,30);
+  ok('U3. Chảo tự ngắt: để 30 phút vẫn vàng giòn, không cháy',!!S.k.fryer[0]&&cookState(S.k.fryer[0].t,COOK.fried)==='perfect');
+  const sm=S.money;S.money=1000;const r4=buyUpgrade('monitor');S.money=sm;
+  ok('U4. Không đủ tiền → không mua được',r4.err==='err_money'&&!S.upg.monitor);
+  ok('U5. Khay lớn → chứa 6 món',okr(buyUpgrade('tray_big'))&&CFG.TRAY_MAX===6);
+  ok('U6. Màn hình 144Hz → giá giờ mọi máy +2.000đ',okr(buyUpgrade('monitor'))&&S.pcs.every(p=>p.hourlyRate===PC_TIERS[p.tier].rate+2000));
+  /* báo cáo + lưu */
+  S.time=CFG.CLOSE-1;until(()=>S.phase==='REPORT',400);const rp=S.report;
+  ok('R1. Báo cáo trừ lương cả 2 người đã làm hôm nay',!!rp&&rp.exp.salary===STAFF.cook.salary+STAFF.cashier.salary);
+  ok('R2. Báo cáo có phí tuyển + nâng cấp, lợi nhuận đúng công thức',!!rp&&rp.exp.hire===STAFF.cook.hire+STAFF.cashier.hire&&rp.exp.upgrade===UPG_BY.fryer_auto.price+UPG_BY.tray_big.price+UPG_BY.monitor.price&&rp.profit===rp.revenue-rp.expense);
+  ok('R3. Sổ sách khớp từng đồng',S.money===S.today.startMoney+S.tx.reduce((a,x)=>a+x.amount,0));
+  const back=deserialize(serialize());
+  ok('R4. Lưu/tải giữ nhân viên, nâng cấp, giá, lô hàng',JSON.stringify(back.staff)===JSON.stringify(S.staff)&&JSON.stringify(back.upg)===JSON.stringify(S.upg)&&JSON.stringify(back.prices)===JSON.stringify(S.prices)&&JSON.stringify(back.lots)===JSON.stringify(S.lots));
+  ok('R5. Ngày mới: nhân viên còn làm thì vẫn tính lương',nextDay()&&!!S.today.staffDays&&S.today.staffDays.cashier===true);
+ }catch(e){ok('Lỗi khi chạy test P3: '+e.message,false,String(e.stack||'').split('\n')[1]||'')}
+ S=saved;SERVING=sv;TEST=false;NOSPAWN=false;applyUpgrades();
+ try{console.table(R)}catch(e){}
+ return R}
+ACT.test=()=>{UI.testRes=runTests().concat(runTestsP3());applyUpgrades();openSheet('tests')};
+function init(){
+ S=loadGame();const fresh=!S;if(!S)S=newState();
+ bind();buildWorld();fit();requestAnimationFrame(fit);applyUpgrades();
+ if(fresh){UI.prepShown=true;openSheet('welcome')}
+ if(/[?&]test\b/.test(location.search)){UI.testRes=runTests().concat(runTestsP3());applyUpgrades();openSheet('tests')}
+ requestAnimationFrame(n=>{last=n;frame(n)})}
  init();
 </script>
 </body>
