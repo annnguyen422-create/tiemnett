@@ -574,3 +574,9 @@ Tất cả: Code ✅ · Runtime ⚠️. Đá không có trong kho (không giới
 2. **Gộp file thành một bản sạch** (bỏ code chết, bỏ cơ chế ghi đè). Sau đó các lần sửa sẽ dễ dán hơn rất nhiều.
 3. Cân bằng: phí tuyển/lương so với lợi nhuận ngày; giá nâng cấp.
 4. Chốt: có tách "đầu tư" khỏi lợi nhuận ngày không.
+
+### TEST-BUG-001 — U6/R2 báo lỗi do bài test thiếu vốn
+**Severity:** Low · **Status:** Fixed (chờ chạy lại)
+**Description:** `runTestsP3` bắt đầu với 5 triệu, đến U6 chỉ còn ~2,2 triệu < giá màn hình 2,4 triệu → buyUpgrade trả err_money (đúng thiết kế), kéo theo R2 sai.
+**Fix:** cho state test bắt đầu 20 triệu (`S.money=S.today.startMoney=20000000`).
+**Affected:** `index.html` — `runTestsP3`. Không ảnh hưởng game thật.
