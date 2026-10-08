@@ -428,3 +428,85 @@ Ghi chú: `(auto)` = có bài tự kiểm thử tương ứng; `(manual)` = cầ
 4. Chỉ đánh dấu `Completed` sau khi đã xác minh runtime.
 5. Mỗi thay đổi: ghi file bị sửa, cập nhật mục 16 và 17.
 6. Không tự bắt đầu phase mới khi chưa có chỉ đạo.
+
+## 1. Current Phase
+
+- **Current Phase:** Phase 2 — Food Preparation
+- **Phase Status:** Needs Verification
+- **Last Updated:** 2026-10-08
+- **Overall Progress:** ~35% toàn bộ spec (ước lượng thô)
+- **Current Development Focus:** Xác minh runtime Phase 1 + Phase 2 qua `?test` (57 bài) và chơi tay. Không làm feature mới.
+
+## 2. Phase Progress
+
+| Phase | Status | Progress | Notes |
+|---|---|---:|---|
+| Phase 1 — Core Game Loop | Needs Verification | ~90% (code) | Chưa có kết quả runtime |
+| Phase 2 — Food Preparation | Needs Verification | ~85% (code) | Thao tác từng bước trên map, chất lượng món, save v2. Chưa chạy runtime |
+| Phase 3 — Vietnamese Atmosphere | Not Started | ~30% (nền) | |
+| Phase 4 — Gameplay & Economy | Not Started | ~20% (nền) | |
+| Phase 5 — QA & Polish | Not Started | ~15% (nền) | Self-test mở rộng 57 bài + bot làm món từng bước |
+
+## 3. Implemented Features → thay mục "### Food" bằng:
+
+### Food (Phase 2) — Code: ✅ · Runtime: ⚠️
+- *Location:* `index.html`, khối `PHASE 2 — FOOD PREPARATION` (dán trước `init();`), các hàm `kBin`, `kTap`, `kTrash`, `kDiscard`, `stationTick`, `cookState`, `deliverTo`, `renderKitchen`, `renderKBar`
+- *Trạm trên map:* Kho, Thùng mì, Tủ đông, Bàn sơ chế (3 chỗ + 5 hũ), Bếp (2), Chảo (2), Quầy pha nước (2 ly + 7 hũ), Tủ lạnh, Thùng rác
+- *Mì (4 loại):* lấy gói → đặt → bóc → cho vào tô → topping (trứng/xúc xích/cá viên/rau, tối đa 3) → nêm → bưng → bắc bếp → vớt. Chín 6′, vùng ngon 6′, hỏng ở 20′ (phút game)
+- *Đồ chiên (5 loại):* lấy → thả chảo → vớt → bày đĩa → rưới tương → khay. Chín 5′, vùng ngon 4′, cháy ở 15′
+- *Pha chế (3 món):* ly → đá → trà/cà phê → chanh/đào/sữa → lắc 2′ → khay. Sai công thức = hỏng
+- *Nước chai (4 loại):* tủ lạnh → khay
+- *Chất lượng:* chưa chín 60/55, quá lửa 70, không đá 80, thiếu mỗi topping −20 → ảnh hưởng hài lòng (+8/+4/0/−8)
+- *Tay 1 món, khay 4 món; bấm món trên khay 2 lần mới bỏ; tạm dừng thì không thao tác được*
+- *Bàn thao tác* (thanh dưới màn hình) hiện nút to của trạm đang đứng
+- *Known limitation:* đá không giới hạn; khách không yêu cầu "ít đá/không đá"; giá không giảm khi món kém
+
+## 4. Partially Implemented → XÓA mục "Food preparation flow" (đã làm). Thêm:
+
+### Phase 1 code bị thay thế nhưng vẫn còn trong file
+**Status:** ⚠️ Partial (technical debt)
+**Implemented:** Phase 2 ghi đè bằng các function cùng tên.
+**Missing:** Code cũ (`startCook`, `pickUp`, `takeFridge`, `renderStations`, `interactStation`, `BUILD.station`, `ACT.cook/take`, `STATIONS`, `SVG_ST`, `menuBoardSVG`) không còn được gọi nhưng chưa xóa.
+**Next step:** Dọn dẹp khi gộp file hoặc chuyển sang React/TS.
+
+## 8. Inventory Status — thay bảng bằng:
+
+| Nhóm | Item | Purchase | Consume | Stock |
+|---|---|---|---|---|
+| Mì | mi, mi_bo, mi_ga, mi_cay | ✅ | Thùng mì | ✅ |
+| Topping | trung, rau (+ xucxich, cavien) | ✅ | Bàn sơ chế | ✅ |
+| Đồ chiên | cavien, bovien, tomvien, xucxich, holo | ✅ | Tủ đông | ✅ |
+| Nước chai | energy, cola, water, soda | ✅ | Tủ lạnh | ✅ |
+| Pha chế | tra, caphe, chanh, dao, sua | ✅ | Quầy pha nước | ✅ |
+| Bao bì | to, dia, ly, tuong | ✅ | theo bước | ✅ |
+Tất cả: Code ✅ · Runtime ⚠️. Đá không có trong kho (không giới hạn).
+
+## 10. Save / Load — thêm:
+- **Save version:** v2. Save v1 tự chuyển (`migrateV1`): đổi món cũ (Mì trứng → Mì tôm + trứng…), giữ kho, tặng số lượng khởi điểm cho nguyên liệu mới. Món đang nấu dở trong save v1 bị bỏ.
+- Save lỗi/phiên bản lạ → sao lưu sang `tiemnet_save_v1_backup_<thời gian>` thay vì ghi đè.
+- Lưu thêm: `k` (bếp), `hand`, `sel`, khay dạng món có chất lượng.
+
+## 13. Known Bugs — cập nhật trạng thái:
+- BUG-002 → **Fixed (needs verification)**: không làm mới bảng khi đang chạm.
+- BUG-004 → **Fixed (needs verification)**: có migration + sao lưu.
+- BUG-007 → **Fixed (needs verification)**: bỏ món cần bấm 2 lần.
+- Thêm **BUG-009 — Hũ nguyên liệu nhỏ trên điện thoại** · Low · Open: hũ trên map chỉ khoảng 17–22px khi thu nhỏ; đã có thanh bàn thao tác thay thế.
+- Thêm **BUG-010 — Khách có thể trả thiếu khi tiền mặt không đủ** · Low · Open: `deliverTo` ghi đủ doanh thu nhưng chỉ trừ tiền khách tới 0 (hiếm, do `availableCash` cũ còn được dùng ở chỗ khác).
+
+## 14. Known Technical Debt — thêm:
+- Phase 2 dùng cơ chế ghi đè function, nên file có code chết của Phase 1.
+- Hằng số thời gian nấu (`COOK`), chất lượng (`QUAL`), giá topping (`TOPPINGS`) chưa gom chung với data Phase 1.
+
+## 16. Last Completed Work — thêm:
+### 2026-10-08 (Phase 2)
+- Hệ thống làm món từng bước: mì, đồ chiên, pha chế, nước chai; chất lượng theo thời điểm vớt; thùng rác; bàn thao tác.
+- Save v2 + migration v1. Sửa BUG-002, BUG-004, BUG-007.
+- Self-test mở rộng lên 57 bài, bot tự làm món từng bước.
+- File đổi: `index.html` (thêm CSS trước `</style>`, thêm JS trước `init();`).
+- **Chưa có:** kết quả runtime.
+
+## 17. Next Recommended Tasks
+1. Chạy `?test`, gửi kết quả; sửa mọi ❌.
+2. Chơi tay 1 ngày ở 1x, xem nhịp độ làm món có quá dồn không (đơn chờ 70′ game ≈ 35 giây thật).
+3. Chốt mô hình doanh thu (mục 7) và roadmap phase chính thức.
+4. Dọn code chết của Phase 1.
