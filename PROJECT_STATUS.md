@@ -510,3 +510,67 @@ Tất cả: Code ✅ · Runtime ⚠️. Đá không có trong kho (không giới
 2. Chơi tay 1 ngày ở 1x, xem nhịp độ làm món có quá dồn không (đơn chờ 70′ game ≈ 35 giây thật).
 3. Chốt mô hình doanh thu (mục 7) và roadmap phase chính thức.
 4. Dọn code chết của Phase 1.
+
+## 1. Current Phase
+- **Current Phase:** Phase 4 — Gameplay & Economy (một phần: nhân viên, nâng cấp, hạn dùng, giá) + cải thiện UX Phase 2
+- **Phase Status:** Needs Verification
+- **Last Updated:** 2026-10-08
+- **Overall Progress:** ~45% toàn bộ spec (ước lượng thô)
+- **Current Development Focus:** Chạy `?test` (98 bài) và gửi kết quả. Không làm feature mới.
+- **Runtime signal:** Chủ project đã chơi tay bản Phase 2 và gửi góp ý gameplay, nghĩa là game chạy được và nấu ăn từng bước hoạt động. Chưa có kết quả self-test.
+
+## 2. Phase Progress
+| Phase | Status | Progress | Notes |
+|---|---|---:|---|
+| Phase 1 — Core Game Loop | Needs Verification | ~90% | Đã chơi tay; chưa có kết quả test tự động |
+| Phase 2 — Food Preparation | Needs Verification | ~95% | Đã chơi tay; đã sửa theo góp ý (đổi nguyên liệu, bảng thao tác, thanh chiên to) |
+| Phase 3 — Vietnamese Atmosphere | Not Started | ~30% (nền) | |
+| Phase 4 — Gameplay & Economy | In Progress | ~45% | Đã có: nhân viên, 9 nâng cấp, hạn dùng theo lô, đổi giá. Chưa có: internet, máy hỏng/sửa, dọn bàn, sự kiện, mở rộng tiệm, vay vốn |
+| Phase 5 — QA & Polish | In Progress | ~25% | 98 bài self-test + 2 bot (tự chơi, đầu bếp ảo) |
+
+## 3. Implemented Features — thêm:
+### Staff — Code ✅ · Runtime ⚠️
+- *Location:* khối `PHASE 3`: `STAFF`, `hireStaff`, `fireStaff`, `staffTick`, `cookStep`, `cookAct`, `cashierStep`, `BUILD.staff`
+- Thu ngân (phí 400k, lương 150k/ngày, 1 việc mỗi 2 phút game): nạp tiền khi khách xin, xếp máy đúng loại.
+- Đầu bếp (phí 700k, lương 200k/ngày, 1 thao tác mỗi phút game): tự làm mì có topping, chiên, pha, nước chai theo đơn → khay. Dùng chung bếp, có tay riêng, không đụng món người chơi đang làm trên Bàn sơ chế.
+- Chỉ 1 người cùng lúc. Lương tính cho mọi người đã làm trong ngày, kể cả khi cho nghỉ giữa ngày.
+### Upgrades — Code ✅ · Runtime ⚠️
+- *Location:* `UPGRADES`, `buyUpgrade`, `applyUpgrades`, `BUILD.upg`
+- Bếp: bếp hẹn giờ, chảo tự ngắt (giữ ở vùng ngon, không hỏng), bếp từ (6→4′), chảo lớn (5→3,5′), máy lắc (2→1′), khay 6 món.
+- Phòng máy: màn hình 144Hz (+vui, +2.000đ/giờ), ghế (+20% thời gian chơi, +vui), máy lạnh (+30%/+15% kiên nhẫn, +20k điện/ngày).
+### Expiry — Code ✅ · Runtime ⚠️
+- *Location:* `SHELF`, `syncLots`, `takeStock`, `returnStock`, `expireLots`, `buyStock`
+- Áp dụng cho cá viên (3 ngày), bò viên (3), tôm viên (2), xúc xích (4), hồ lô (3). Lô cũ dùng trước. Hết hạn tự bỏ đầu ngày mới, hiện ở bảng chuẩn bị.
+### Menu pricing — Code ✅ · Runtime ⚠️
+- *Location:* `priceOf`, `setPrice`, `recipeCost`, `BUILD.orders`. Bước 1.000đ, giới hạn 50–200% giá gốc. Giá cao hơn gốc thì khách có xác suất bỏ món đó.
+### Tutorial & UX — Code ✅ · Runtime ⚠️
+- Thẻ hướng dẫn lần đầu cho mì, chiên, pha (`chainTut`). Viền xanh chỉ trạm tiếp theo (`coachTarget`, `renderCoach`). Bật/tắt và xem lại trong Cài đặt.
+- Đổi hoặc trả nguyên liệu đang cầm (`kBin` mới). Bảng thao tác có nút ✕, bấm ra ngoài để đóng, hiện "Cần làm" theo đơn và số đếm trên hũ. Thanh tiến độ chiên/nấu to hơn và có thêm trong bảng.
+- Kiên nhẫn: chờ quầy ×1,6, chờ món ×1,5 (`CFG.PAT_WAIT`, `CFG.PAT_ORDER`).
+
+## 7. Economy — thêm:
+- Chi phí mới: lương (`STAFF_SALARY`), phí tuyển (`STAFF_HIRE`), nâng cấp (`UPGRADE`), máy lạnh +20k điện.
+- Báo cáo tính phí tuyển và nâng cấp vào chi phí của ngày mua, nên lợi nhuận ngày đó sẽ thấp. Cần chốt có nên tách "đầu tư" khỏi lợi nhuận vận hành hay không.
+
+## 13. Known Bugs — thêm:
+- **BUG-011 — Đầu bếp có thể đứng yên** · Low · Open: nếu cả 3 ô Bàn sơ chế bị món của người chơi chiếm, đầu bếp không làm mì hoặc đồ chiên được.
+- **BUG-012 — Vạch vùng ngon trên bản đồ chưa đổi ngay sau khi mua bếp/chảo nhanh** · Low · Open: chỉ cập nhật khi đặt món mới vào ô.
+- **BUG-013 — Thời gian chờ nạp tiền chưa được nới** · Low · Open: `seatedTick` (Phase 1) vẫn dùng 40–45′.
+- **BUG-010** — giữ nguyên Open.
+
+## 14. Known Technical Debt — thêm:
+- File có 3 lớp ghi đè (Phase 1 → 2 → 3), nhiều code chết. Nên gộp lại thành một bản sạch trước khi làm tiếp.
+- Đầu bếp đánh dấu món bằng tiền tố `ws:'c:…'`; bot test dùng `ws` không có tiền tố.
+- `applyUpgrades()` sửa trực tiếp `COOK` và `CFG.TRAY_MAX` (giá trị toàn cục).
+
+## 16. Last Completed Work — thêm:
+### 2026-10-08 (theo góp ý chơi thử)
+- Nhân viên (thu ngân/đầu bếp), 9 nâng cấp, hạn dùng theo lô, đổi giá thực đơn, hướng dẫn lần đầu + viền chỉ dẫn, đổi/trả nguyên liệu, đóng bảng thao tác khi bấm ra ngoài, hiện món cần làm, thanh chiên to, giảm tốc độ mất kiên nhẫn.
+- Thêm 33 bài test (tổng 98). Đính chính: Phase 2 có 65 bài, không phải 57.
+- File đổi: `index.html` (CSS trước `</style>`; JS phần C1 + C2 trước `init();`).
+
+## 17. Next Recommended Tasks
+1. Chạy `?test`, sửa mọi ❌.
+2. **Gộp file thành một bản sạch** (bỏ code chết, bỏ cơ chế ghi đè). Sau đó các lần sửa sẽ dễ dán hơn rất nhiều.
+3. Cân bằng: phí tuyển/lương so với lợi nhuận ngày; giá nâng cấp.
+4. Chốt: có tách "đầu tư" khỏi lợi nhuận ngày không.
