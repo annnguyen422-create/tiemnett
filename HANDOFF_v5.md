@@ -234,3 +234,57 @@ Quầy ra món ẩn trên bản đồ cho tới khi mua.
 |---|---|
 | v4 | Phần 1–9 + Patch A (thanh trên gọn, bỏ tốc độ, bỏ bóng chat khi xếp hàng) · B (kiên nhẫn theo số món, ngồi chờ món, topping đúng y) · B-fix (đầu hàng phải tới nơi) · C (Quầy ra món là nâng cấp) · D (mở món theo ngày, dạy món mới) · E/E2 (badge xN) · F (nút "−" trả chai) · G/G3 (màu, cỡ badge, gọn tủ bản đồ) · H/H2 (tag "Tiếp theo") |
 | **v5** | Viết lại sạch toàn bộ v4 + patch: mỗi hàm 1 bản, không observer/interval vá UI, `renderMeta` gom lớp CSS trạng thái, `migrateC` chạy lúc tải save, 1 hàm `runTests` 151 bài. Hành vi giữ nguyên v4. |
+---
+
+# CẬP NHẬT v5.1 — "Chất net Việt Nam"
+
+> File: `v51.html` (bản thử). Test: **182/182**. Khi chốt sẽ đổi tên thành `index.html`, giữ `index.html` cũ thành `v5.html`.
+> `CFG.BUILD='v5.1'` · save vẫn `VERSION 3`, key `tiemnet_save_v3` (save cũ chơi tiếp được).
+
+## Nguyên tắc giao diện v5.1
+- **Ít chữ trên bản đồ.** Phản ứng của khách = biểu tượng. Câu nói đầy đủ, biệt danh chỉ hiện khi bấm vào khách.
+- Mọi thứ mới (món, khách, sự kiện) được giới thiệu **1 lần** trong khung lật trang ở bảng chuẩn bị đầu ngày: hình minh hoạ + 1 dòng chữ.
+
+## v5.1a — Không khí
+| Thứ | Chi tiết |
+|---|---|
+| Phản ứng khách | Khách đang chơi thỉnh thoảng hiện 🎉 thắng · 😤 thua · 📶 lag · 🥵 nóng (chỉ khi chưa có máy lạnh) · 💤 buồn ngủ, ~2 giây. Tần suất `.02/phút game`. Hằng `AMB`, hàm `ambKeys()`, field khách `c.emo={k,until,txt}` |
+| Biệt danh | `NICKS[]` → `c.nick`, chỉ hiện trong bảng khách |
+| Bản đồ | Biển LED "INTERNET · GAME" nhấp nháy (`.led`) · 2 quạt trần quay (`decorHTML`, `.fan`) · ghế máy Thường màu đỏ, Gaming màu xanh |
+| Bảng giá | Dòng chữ giá trên tường → bảng đen nhỏ (`data-act="menuboard"`, bấm mở bảng Đồ ăn) |
+| Đã bỏ | Xe máy, dép trước cửa · ô **Kho** trên bản đồ (nhập hàng qua nút 📦 Kho ở thanh dưới) |
+
+## v5.1b — Kệ ăn vặt
+- Trạm `snack` ở **góc trên trái** (chỗ Kho cũ), mở **ngày 1**.
+- 3 món (type `snack`, kind `food`): Bim bim 8k (vốn 4k) · Hướng dương 10k (5k) · Bánh mì ngọt 10k (5k). Chờ món 15 phút như nước chai.
+- Thao tác y hệt Tủ lạnh: bấm = +1 lên khay, badge xanh xN, nút đỏ "−" trả lại.
+- Code: `GRAB={fridge:1,snack:1}` = trạm "bấm là lấy". Mọi chỗ trước đây kiểm tra `st==='fridge'` giờ dùng `GRAB[st]`.
+- Khách hay gọi: học sinh (bim bim, hướng dương), sinh viên (bánh mì ngọt), game thủ (bim bim), khách đêm (hướng dương, bánh mì ngọt).
+
+## v5.1c — Học sinh đồng phục + phụ huynh
+- Mở **ngày 4** (`NEWCHAR.uniform.day`). Ngày thường, trước 17h, 60% học sinh mặc **áo trắng + khăn quàng đỏ** (`c.uniform`, `look.scarf`).
+- Ngồi máy 30–90 phút → **phụ huynh** (đeo kính, 😠) vào, đi tới máy → con 😭 về.
+- Món đang chờ bị huỷ, **không trừ sao, không tính hỏng đơn, không tính bỏ về**. Đếm vào `S.today.pulled`.
+- Phụ huynh là một "khách" đặc biệt trong `S.customers`: `type:'phuhuynh'`, state `PARENT_IN` → `LEAVING`, `rated:true`. Hàm `spawnParent`, `parentArrive`.
+
+## Khung giới thiệu lật trang
+- `introPages()` trả về danh sách trang: **Món mới** (theo `UNLOCK`) → **Khách mới** (theo `NEWCHAR`, chưa có trong `S.seen`) → *(Sự kiện mới — v5.1d)*.
+- Nhiều trang: nút ← và **→ màu cam nhấp nháy** + chấm ●○. Trang cuối tắt nút →. `UI.ip` = trang đang xem, `ACT.ip`.
+- Bấm **Mở cửa** → đánh dấu `S.seen[k]=1`, không giới thiệu lại. Save cũ đã qua ngày mở vẫn được giới thiệu 1 lần.
+
+## State mới
+`S.seen{}` · khách: `nick, emo, uniform, parentAt, parentId` · phụ huynh: `type:'phuhuynh', target` · `S.today.pulled`.
+
+## Nhóm test mới (tổng 182)
+| Nhóm | Nội dung | Số bài |
+|---|---|---|
+| Y | Kệ ăn vặt | 9 |
+| Z | Không khí, bảng đen, vị trí Kệ snack | 7 |
+| PH | Học sinh đồng phục + phụ huynh | 8 |
+| NC | Giới thiệu khách mới | 4 |
+| IP | Khung lật trang | 3 |
+
+## Bài học khi sửa trên GitHub
+- Khi "thay cả dòng": **bôi đen hết dòng** rồi dán. Dán đè lên một phần sẽ để lại đuôi dòng cũ → lỗi cú pháp, trang trắng.
+- Code có dấu backtick luôn để trong khung code riêng, không để lẫn trong câu chữ.
+- Trang trắng chưa có chữ trên thanh trên = lỗi cú pháp. Xem dòng đỏ đầu tiên trong Console.
