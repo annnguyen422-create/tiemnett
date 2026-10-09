@@ -250,7 +250,7 @@ body.kb #carry{display:none}
 /* ================= 1. CONFIG ================= */
 const CFG={W:960,H:600,MIN_PER_SEC:2,OPEN:480,CLOSE:1440,LAST_ENTRY:1380,START_MONEY:5000000,
  ELEC_BASE:40000,ELEC_PC_HOUR:2500,INTERNET:50000,MAINT:30000,CARRY_MAX:4,PICKUP_N:6,WALK:60,PLAYER_SPEED:340,
- AUTOSAVE:30000,KEY:'tiemnet_save_v3',OLD_KEY:'tiemnet_save_v1',VERSION:3,BUILD:'v5',AISLE_X:290,DOOR:{x:70,y:598},
+ AUTOSAVE:30000,KEY:'tiemnet_save_v3',OLD_KEY:'tiemnet_save_v1',VERSION:3,BUILD:'v5.1',AISLE_X:290,DOOR:{x:70,y:598},
  COUNTER_SPOT:{x:140,y:232},PICKUP_SPOT:{x:872,y:352},KIT_Y:188,STORAGE_SPOT:{x:54,y:188},
  RECHARGE_OPTIONS:[10000,20000,50000,100000,200000]};
 const PAT={queue:80,orderBase:40,budget:{bottle:15,snack:15,mix:35,fried:50,noodle:60},multi:[1,1,1.15,1.3],drainPlaying:.7,drainReady:1.6,drainWait:1,drainQueue:1,recharge:60,failLeave:2};
@@ -885,7 +885,7 @@ function kBin(st,id){
    returnStock(h.b,h.exp);const tk=takeStock(id);S.hand={k:'raw',cat,b:id,exp:tk?tk.exp:null};return KO('SWAP')}
   if(h)return KE('err_hand_full',{item:wiName(h)});if(!has())return KE('err_stock',{item:itemName(id)});
   const tk=takeStock(id);S.hand={k:'raw',cat,b:id,exp:tk?tk.exp:null};return KO(cat==='noodle'?'TAKE_NOODLES':'TAKE_FRY')}
- if(st==='fridge'){if(!canFinish())return errFull();if(!has())return KE('err_stock',{item:itemName(id)});
+  if(GRAB[st]){if(!canFinish())return errFull();if(!has())return KE('err_stock',{item:itemName(id)});return errFull();if(!has())return KE('err_stock',{item:itemName(id)});
   takeStock(id);finishDish(newDish(id,[],100));return KO('TAKE_DRINK')}
  if(st==='board'){
   const i=pickTarget('board',w=>w.k==='prep'&&w.cat==='noodle'&&!w.top.includes(id)&&w.top.length<3&&cook===isCookItem(w));
@@ -1463,7 +1463,7 @@ const stat=(l,v)=>`<div class="stat"><small>${l}</small><b>${v}</b></div>`;
 const emptyBox=k=>`<div class="empty"><b>${t(k+'_empty_t')}</b><p>${t(k+'_empty_d')}</p></div>`;
 const rowKV=(k,v)=>`<div class="row"><span>${k}</span><b>${v}</b></div>`;
 const L3=(l,v,neg)=>`<div class="row"><span>${l}</span><b class="${neg?'badc':'okc'}">${neg?'-':'+'}${vnd(v)}</b></div>`;
-function custHead(c){return`<div class="head">${charSVG(c.look,{mood:c.happiness>65?2:c.happiness>35?1:0,s:.9})}<div><b>${esc(c.name)}</b>${c.nick? <span class="muted">· ${esc(c.nick)}</span>:''}<div class="muted">${CT[c.type].name}${c.returning?` · <span class="badge acc">${t('returning')}</span>`:''}</div></div></div>`}
+function custHead(c){return`<div class="head">${charSVG(c.look,{mood:c.happiness>65?2:c.happiness>35?1:0,s:.9})}<div><b>${esc(c.name)}</b>${c.nick?` <span class="muted">· ${esc(c.nick)}</span>`:''}<div class="muted">${CT[c.type].name}${c.returning?` · <span class="badge acc">${t('returning')}</span>`:''}</div></div></div>`}{return`<div class="head">${charSVG(c.look,{mood:c.happiness>65?2:c.happiness>35?1:0,s:.9})}<div><b>${esc(c.name)}</b>${c.nick? <span class="muted">· ${esc(c.nick)}</span>:''}<div class="muted">${CT[c.type].name}${c.returning?` · <span class="badge acc">${t('returning')}</span>`:''}</div></div></div>`}
 function rcButtons(hl){return CFG.RECHARGE_OPTIONS.map(a=>`<button data-ui="rc" data-a="${a}" class="${a===hl?'pri':''}">${vk(a)}</button>`).join('')+`<button data-ui="rcx">${t('custom')}</button>`}
 function eqLine(c){const r=UI.lastRc;return r&&r.id===c.id?`<div class="eq">${vnd(r.before)} + ${vnd(r.amt)} = <b>${vnd(r.after)}</b></div>`:''}
 function moodRow(c){const mo=moodOf(c);if(!mo)return'';const k=moodKey(mo.f);return rowKV(t('mood'),`${MOOD_ICON[k]} ${t('mood_'+k)} · ${Math.round(mo.f*100)}%`)}
