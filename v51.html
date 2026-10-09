@@ -192,6 +192,10 @@ body.kb #carry{display:none}
 #toasts{position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;width:max-content;max-width:92vw}
 .toast{background:var(--dark);color:#fff;padding:8px 14px;border-radius:12px;font-size:14px;animation:sh .2s;text-align:center}
 .toast.ok{background:#2f8a47} .toast.bad{background:#c94141}
+.led{animation:blink .8s infinite}
+.fan{pointer-events:none}.fan svg{animation:spin 1.4s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.bub.emo.on{font-size:18px;padding:0 5px;line-height:1.2}
 </style>
 </head>
 <body>
@@ -261,7 +265,7 @@ const maxItemsOn=d=>d<=3?1:d<=5?2:3;
 
 /* ================= 1. DATA ================= */
 const BRAND={energy:'Sấm Sét',cola:'Cola Mát',water:'Suối Mát',soda:'Chanh Sủi'}; /* đổi tên thương hiệu tại đây */
-const PC_TIERS={thuong:{rank:1,name:'Thường',rate:8000,perf:'LOW',chair:'#5B9DEF'},gaming:{rank:2,name:'Gaming',rate:12000,perf:'MEDIUM',chair:'#E85D5D'},vip:{rank:3,name:'VIP',rate:18000,perf:'HIGH',chair:'#8E6CD9'}};
+const PC_TIERS={thuong:{rank:1,name:'Thường',rate:8000,perf:'LOW',chair:'#E85D5D'},gaming:{rank:2,name:'Gaming',rate:12000,perf:'MEDIUM',chair:'#3E7CB1'},vip:{rank:3,name:'VIP',rate:18000,perf:'HIGH',chair:'#8E6CD9'}};
 const PC_LAYOUT=[['gaming',330,200],['gaming',480,200],['gaming',630,200],['vip',780,200],['thuong',330,380],['thuong',480,380],['thuong',630,380],['thuong',780,380]];
 const ITEMS=[
  {id:'mi',name:'Mì tôm (gói)',cat:'Mì',unit:'gói',cost:4000,start:15,min:8,pack:10},
@@ -326,7 +330,10 @@ const KIT={
   trash:{x:908,y:94,w:32,h:46,name:'st_trash'},  snack:{x:12,y:340,w:88,h:96,name:'st_snack',spot:{x:56,y:454},bins:[['bimbim',5,26,24,30],['huongduong',32,26,24,30],['banhngot',59,26,24,30]]}};
 const CABINETS=['noodlebox','freezer','fridge'];
   const GRAB={fridge:1,snack:1}; /* trạm "bấm là lấy" giống Tủ lạnh */
-const PICKUP={x:896,y:196,w:56,h:324};
+const AMB={win:'🎉',lose:'😤',lag:'📶',hot:'🥵',sleepy:'💤'}; /* phản ứng của khách đang chơi */
+const ambKeys=()=>Object.keys(AMB).filter(k=>k!=='hot'||!(S&&S.upg.aircon));
+const NICKS=['SátThủ2k9','Bé Na','TuấnĐẹpTrai','Hùng Bến Tre','Chú Ba','Gà Mờ','ProNoKill','Mèo Hồng','XạThủ07','Lão Đại','Bé Bơ','Tí Nị'];
+ const PICKUP={x:896,y:196,w:56,h:324};
 const pickupSlotPos=i=>[6,30+i*48];
 const STAFF={cashier:{hire:400000,salary:150000,every:1},cook:{hire:700000,salary:200000,every:.5}};
 const STAFF_LOOK={cook:{skin:'#F6CBA0',hair:'#3b3b3b',shirt:'#fff',pants:'#303030',style:0,acc:1,accColor:'#ffffff'},cashier:{skin:'#FFE0C2',hair:'#2b2420',shirt:'#5B9DEF',pants:'#3a4a6b',style:1,acc:0}};
@@ -484,6 +491,8 @@ const DIALOGUE={vi:{
  impatient:['Món em đâu rồi anh?','Anh ơi nhanh giúp em với.'],ready_wait:['Xong rồi sao chưa mang ra anh?','Mì nguội mất anh ơi!'],
  queue_full:['Đông quá, thôi em về.','Hết chỗ xếp hàng rồi...'],low_tier:['Máy yếu quá anh ơi...'],bye:['Em về nha anh!','Mai em ghé tiếp.'],
  broke:['Hết tiền rồi, em về đây.'],oos:['Hết món rồi hả anh...'],meh:['Tạm được anh ạ.','Cũng được.'],bad:['Dở quá anh ơi...','Mì nở hết rồi anh.','Chưa chín anh ơi!'],
+ amb_win:['Gánh team luôn anh ơi!','Thắng rồi!!'],amb_lose:['Team ngu quá anh ơi 😤','Thua nữa rồi...'],amb_lag:['Anh ơi máy lag quá!','Ping cao quá anh ơi'],
+ amb_hot:['Nóng quá anh ơi, bật máy lạnh đi','Quạt yếu quá anh'],amb_sleepy:['Buồn ngủ quá...','Thêm ván nữa thôi'],
  pricey:['Đắt quá, thôi khỏi.','Giá này hơi chát anh ơi.'],wrong_top:['Không đúng món em gọi anh ơi.','Em gọi khác topping mà anh...']}};
 function line(k,v){const a=(DIALOGUE[LANG]||DIALOGUE.vi)[k]||[k];let s=a[Math.floor(Math.random()*a.length)];if(v)for(const x in v)s=s.split('{'+x+'}').join(v[x]);return s}
  /* ================= 3. STATE ================= */
@@ -680,7 +689,7 @@ function spawnCustomer(o){
   gamingTime:rint(T.play[0],T.play[1]),played:0,hunger:rint(0,45),thirst:rint(0,45),
   preferredPC:T.prefer,preferredFood:pick(T.foods),preferredDrink:pick(T.drinks),
   order:null,orderPatience:0,orderPatienceMax:1,lastOrderT:S.time,eatT:0,rechargeReq:0,rechargePatience:0,rechargePatienceMax:1,reqCooldown:0,
-  say:null,joke:T.id==='hocsinh'&&Math.random()<.25,askAmt:0,askText:''};
+  say:null,emo:null,nick:pick(NICKS),joke:T.id==='hocsinh'&&Math.random()<.25,askAmt:0,askText:''};
  if(c.joke)c.gamingTime=Math.max(c.gamingTime,180);
  let ask=rint(T.recharge[0]/10000,T.recharge[1]/10000)*10000;if(balance>=30000)ask=0;
  c.askAmt=Math.min(ask,Math.floor(money/10000)*10000);
@@ -772,7 +781,7 @@ function seatedTick(c,dt){
    c.rechargePatience=Math.max(c.rechargePatience,c.rechargePatienceMax*.6);say(c,line(c.joke?'more':'recharge',{amt:vk(amt)}))}
   else{say(c,line('broke'),30);checkout(c)}return}
  if(playing){c.balance-=cost;pc.revenue+=cost;pc.sessionTime+=dt;S.today.pcUsage+=cost;S.today.pcMinutes+=dt;c.played+=dt;c.hunger+=T.hunger*.7*dt;c.thirst+=T.thirst*.7*dt}
- c.waitOnly=!playing;
+  c.waitOnly=!playing;if(playing&&c.state==='PLAYING'&&!c.order&&!c.say&&(!c.emo||S.time>c.emo.until+20)&&Math.random()<.02*dt){const k=pick(ambKeys());c.emo={k,until:S.time+4,txt:line('amb_'+k)}}
  if(c.state==='EATING'){c.eatT-=dt;if(c.eatT<=0)c.state=c.order?'WAITING_FOOD':'PLAYING'}
  else if(c.state==='WAITING_FOOD'){
   const ready=orderReady(c),m0=moodKey(c.orderPatience/c.orderPatienceMax);
@@ -1091,8 +1100,13 @@ const counterSVG=()=>`<svg viewBox="0 0 200 76" width="200" height="76" aria-hid
 const doorSVG=()=>`<svg viewBox="0 0 90 44" width="90" height="44" aria-hidden="true"><rect x="2" y="2" width="86" height="40" rx="6" fill="#bfe2f5" ${OL}/><path d="M45 2 v40" stroke="#303030" stroke-width="2"/><rect x="12" y="28" width="66" height="12" rx="5" fill="#E85D5D"/>${txt(45,37,'CHÀO MỪNG',7,'#fff')}</svg>`;
 const benchSVG=()=>`<svg viewBox="0 0 110 36" width="110" height="36" aria-hidden="true"><rect x="10" y="20" width="6" height="14" fill="#8a6440"/><rect x="94" y="20" width="6" height="14" fill="#8a6440"/><rect x="2" y="6" width="106" height="16" rx="6" fill="#C99A6B" ${OL}/></svg>`;
 const plantSVG=()=>`<svg viewBox="0 0 40 52" width="40" height="52" aria-hidden="true"><circle cx="13" cy="18" r="9" fill="#58B368" ${OL}/><circle cx="27" cy="16" r="9" fill="#5CC8A1" ${OL}/><circle cx="20" cy="8" r="8" fill="#58B368" ${OL}/><path d="M9 30 H31 L28 50 H12 Z" fill="#FF7A59" ${OL}/></svg>`;
-const signSVG=()=>`<svg viewBox="0 0 200 24" width="200" height="24" aria-hidden="true"><rect x="2" y="2" width="196" height="20" rx="10" fill="#303030"/>${txt(100,17,'★ TIỆM NET ★',13,'#FFB84D')}</svg>`;
-/* ---------- món ăn ở từng giai đoạn ---------- */
+const boardSVG=()=>`<svg viewBox="0 0 70 26" width="70" height="26" aria-hidden="true"><rect x="1" y="1" width="68" height="24" rx="3" fill="#2f4a3a" stroke="#8a6440" stroke-width="2"/><path d="M8 8 h22 M8 13 h16 M8 18 h20" stroke="#f4f4f4" stroke-width="1.5" stroke-linecap="round" opacity=".8"/><path d="M40 12 h20 a10 8 0 0 1 -20 0z" fill="#fff" opacity=".85"/><path d="M45 9 q2-3 0-6 M51 9 q2-3 0-6" stroke="#fff" stroke-width="1" fill="none"/></svg>`;
+const fanSVG=()=>`<svg viewBox="0 0 50 50" width="50" height="50" aria-hidden="true"><g opacity=".7"><ellipse cx="25" cy="10" rx="5" ry="10" fill="#8a6440"/><ellipse cx="25" cy="40" rx="5" ry="10" fill="#8a6440"/><ellipse cx="10" cy="25" rx="10" ry="5" fill="#8a6440"/><ellipse cx="40" cy="25" rx="10" ry="5" fill="#8a6440"/><circle cx="25" cy="25" r="5" fill="#303030"/></g></svg>`;
+function motoG(ox,col){return`<circle cx="${ox+10}" cy="36" r="6" fill="#303030"/><circle cx="${ox+40}" cy="36" r="6" fill="#303030"/><path d="M${ox+6} 31 Q${ox+12} 18 ${ox+26} 20 L${ox+38} 20 L${ox+46} 31 Z" fill="${col}" ${S2}/><rect x="${ox+16}" y="14" width="14" height="5" rx="2" fill="#303030"/><path d="M${ox+40} 20 l4 -10" stroke="#303030" stroke-width="2"/>`}
+const decorHTML=()=>`<div class="ent fan" style="left:440px;top:318px;z-index:900">${fanSVG()}</div><div class="ent fan" style="left:700px;top:318px;z-index:900">${fanSVG()}</div>
+ <div class="ent" style="left:178px;top:546px;z-index:590;pointer-events:none"><svg viewBox="0 0 110 44" width="110" height="44" aria-hidden="true">${motoG(2,'#E85D5D')}${motoG(56,'#5B9DEF')}</svg></div>
+ <div class="ent" style="left:120px;top:578px;z-index:590;pointer-events:none"><svg viewBox="0 0 40 16" width="40" height="16" aria-hidden="true"><ellipse cx="8" cy="8" rx="5" ry="7" fill="#E85D5D" stroke="#303030"/><ellipse cx="19" cy="8" rx="5" ry="7" fill="#E85D5D" stroke="#303030"/><ellipse cx="32" cy="9" rx="5" ry="6" fill="#5B9DEF" stroke="#303030"/></svg></div>`;
+ const signSVG=()=>`<svg viewBox="0 0 200 24" width="200" height="24" aria-hidden="true"><rect x="2" y="2" width="196" height="20" rx="4" fill="#1d1d2b" stroke="#E85D5D" stroke-width="2"/><g class="led">${[...Array(12)].map((_,i)=>`<circle cx="${10+i*16}" cy="5" r="1.4" fill="#FFB84D"/>`).join('')}</g>${txt(100,18,'INTERNET · GAME',12,'#5CE1E6')}</svg>`;/* ---------- món ăn ở từng giai đoạn ---------- */
 const NOODLE_COL={mi:'#F2B84B',mi_bo:'#C0603A',mi_ga:'#E9C46A',mi_cay:'#E85D5D'},BROTH={mi:'#F0B860',mi_bo:'#C9773F',mi_ga:'#EFCB6A',mi_cay:'#E2553B'};
 const FRY_COL={cavien:'#F4E3C1',bovien:'#C9A58A',tomvien:'#F6C9B8',xucxich:'#E9A08C',holo:'#EBD3A8'},COOK_COL={under:'#EBC27A',perfect:'#DB9A4E',over:'#9E5B2A',ruined:'#3a2a20'};
 const BOTTLE_COL={energy:'#E85D5D',cola:'#7a4b2a',water:'#9fd3f5',soda:'#7BC67E'};
@@ -1185,7 +1199,7 @@ function buildWorld(){
  let h=`<div class="ent kfloor"></div><div class="ent pcrug"></div>
  <div class="ent qlane" style="left:112px;top:328px;width:56px;height:196px"></div><div class="ent qlane" style="left:168px;top:470px;width:112px;height:54px"></div>
  <div class="zone" style="left:92px;top:322px">🧍 XẾP HÀNG</div>
- <div class="ent" style="left:380px;top:3px;z-index:2">${signSVG()}</div><div class="ent wallmenu" id="wallmenu">${esc(wallMenuText())}</div>`;
+ <div class="ent" style="left:380px;top:3px;z-index:2">${signSVG()}</div><div class="ent" data-act="menuboard" role="button" tabindex="0" aria-label="${t('nav_food')}" style="left:604px;top:2px;z-index:3">${boardSVG()}</div>${decorHTML()}`;
  h+=`<div class="ent" data-act="storage" tabindex="0" role="button" aria-label="${t('st_storage')}" style="left:16px;top:38px;width:76px;height:100px;z-index:138">${KSVG.storage}<div class="lbl">${t('st_storage')}</div></div>`;
  for(const st in KIT){const K=KIT[st];
   h+=`<div class="ent" data-act="kst" data-id="${st}" tabindex="0" role="button" aria-label="${t(K.name)}" style="left:${K.x}px;top:${K.y}px;width:${K.w}px;height:${K.h}px;z-index:${K.y+K.h}">${KSVG[st]}<div class="lbl">${t(K.name)}</div>`;
@@ -1267,6 +1281,7 @@ function bubbleOf(c){
    return`<span class="oi ${cls}">${wiSVG({k:'dish',r:it.r,top:it.top},22)}</span>`}).join('');
   return{k,cls:'order',html}}
  if(c.state==='RECHARGE'||c.rechargeReq)return{k:'r'+c.rechargeReq+mk,cls:'money',html:mi+'💰 '+esc(c.joke?t('b_more'):t('b_recharge',{amt:vk(c.rechargeReq||10000)}))};
+  if(c.emo&&c.state==='PLAYING'&&S.time<c.emo.until)return{k:'e'+c.emo.k,cls:'emo',html:AMB[c.emo.k]};
  if(c.say)return{k:'s'+c.say.text,html:esc(c.say.text)};
  if(c.state==='EATING')return{k:'eat',html:'😋'};return null}
 function renderCustomers(){const lay=$('lay'),alive=new Set(),q=queueList(),custs=(UI.hl&&UI.hl.custs)||new Set();
@@ -1424,7 +1439,7 @@ function onWorld(e){
  if(UI.sheet&&UI.sheet.kind==='counter'&&el&&el.dataset.act==='pc'){const pc=pcById(+el.dataset.id),c=custById(UI.sheet.id);if(pc&&c&&pc.status==='AVAILABLE'){doAssign(c,pc);return}}
  if(!el||S.phase==='REPORT')return;
  const act=el.dataset.act,id=el.dataset.id;
- if(act==='pc'){openSheet('pc',+id);return}
+ if(act==='pc'){openSheet('pc',+id);return}if(act==='menuboard'){openSheet('orders');return}
  if(S.paused){fx.err('err_paused');return}
  if(UI.sheet&&UI.sheet.kind==='counter')closeSheet();
  if(act==='cust'){const c=custById(+id);if(!c)return;
@@ -1448,7 +1463,7 @@ const stat=(l,v)=>`<div class="stat"><small>${l}</small><b>${v}</b></div>`;
 const emptyBox=k=>`<div class="empty"><b>${t(k+'_empty_t')}</b><p>${t(k+'_empty_d')}</p></div>`;
 const rowKV=(k,v)=>`<div class="row"><span>${k}</span><b>${v}</b></div>`;
 const L3=(l,v,neg)=>`<div class="row"><span>${l}</span><b class="${neg?'badc':'okc'}">${neg?'-':'+'}${vnd(v)}</b></div>`;
-function custHead(c){return`<div class="head">${charSVG(c.look,{mood:c.happiness>65?2:c.happiness>35?1:0,s:.9})}<div><b>${esc(c.name)}</b><div class="muted">${CT[c.type].name}${c.returning?` · <span class="badge acc">${t('returning')}</span>`:''}</div></div></div>`}
+function custHead(c){return`<div class="head">${charSVG(c.look,{mood:c.happiness>65?2:c.happiness>35?1:0,s:.9})}<div><b>${esc(c.name)}</b>${c.nick? <span class="muted">· ${esc(c.nick)}</span>:''}<div class="muted">${CT[c.type].name}${c.returning?` · <span class="badge acc">${t('returning')}</span>`:''}</div></div></div>`}
 function rcButtons(hl){return CFG.RECHARGE_OPTIONS.map(a=>`<button data-ui="rc" data-a="${a}" class="${a===hl?'pri':''}">${vk(a)}</button>`).join('')+`<button data-ui="rcx">${t('custom')}</button>`}
 function eqLine(c){const r=UI.lastRc;return r&&r.id===c.id?`<div class="eq">${vnd(r.before)} + ${vnd(r.amt)} = <b>${vnd(r.after)}</b></div>`:''}
 function moodRow(c){const mo=moodOf(c);if(!mo)return'';const k=moodKey(mo.f);return rowKV(t('mood'),`${MOOD_ICON[k]} ${t('mood_'+k)} · ${Math.round(mo.f*100)}%`)}
@@ -1469,7 +1484,7 @@ const BUILD={
    const act=it.done?`<span class="badge ok">✓ ${t('delivered')}</span>`:ready?`<button class="sm go" data-ui="deliver" data-a="${c.id}">${t('btn_deliver')} ➜</button>`
     :`<span class="badge ${s==='os_todo'?'':'wip'}">${t(s)}</span>${s==='os_todo'&&!hasStockFor(it.r)?` <button class="sm" data-ui="oos" data-a="${c.id}|${i}">${t('btn_oos')}</button>`:''}`;
    return`<div class="oitem">${wiSVG({k:'dish',r:it.r,top:it.top},28)}<span class="grow">${esc(dishLabel(it))}<small class="muted"> · ${vk(itemPrice(it))}</small></span>${act}</div>`}).join(''):'';
-  return`${bad?`<p class="badc">${esc(t('err_wrong_top',{item:dishLabel(bad)}))}</p>`:''}${custHead(c)}${rowKV(t('state'),t('cs_'+c.state))}${moodRow(c)}${rowKV('PC',`#${pad(pc.id)} ${PC_TIERS[pc.tier].name}`)}${rowKV(t('played'),dur(c.played))}${rowKV(t('balance'),vnd(c.balance))}${eqLine(c)}${ord}
+  return`${bad?`<p class="badc">${esc(t('err_wrong_top',{item:dishLabel(bad)}))}</p>`:''}${custHead(c)}${c.emo&&S.time<c.emo.until+30?`<p class="say">“${esc(c.emo.txt)}”</p>`:''}${rowKV(t('state'),t('cs_'+c.state))}${moodRow(c)}${rowKV('PC',`#${pad(pc.id)} ${PC_TIERS[pc.tier].name}`)}${rowKV(t('played'),dur(c.played))}${rowKV(t('balance'),vnd(c.balance))}${eqLine(c)}${ord}
   <h4>${t('recharge')} ${c.rechargeReq?`<span class="badge warn">${esc(t('b_recharge',{amt:vk(c.rechargeReq)}))}</span>`:''}</h4><div class="grid">${rcButtons(c.rechargeReq)}</div>`},
  pc(id){const p=pcById(id);if(!p)return null;const c=p.currentCustomer?custById(p.currentCustomer):null;
   return`<h3>PC #${pad(p.id)} · ${PC_TIERS[p.tier].name}</h3>${rowKV(t('state'),ST_ICON[p.status]+' '+t('pc_'+p.status))}${rowKV(t('rate'),vnd(p.hourlyRate)+t('per_hour'))}${rowKV(t('customer'),c?esc(c.name):'—')}${rowKV(t('pc_time'),c?dur(p.sessionTime):'—')}${rowKV(t('pc_rev'),vnd(p.revenue))}
@@ -1963,6 +1978,17 @@ function runTests(){
   ok('Y8. Ăn vặt chờ nhanh như nước chai',pt('bimbim')===pt('cola'));
   const yd=orders(1,60);
   ok('Y9. Ngày 1: khách đói gọi được đồ ăn vặt',yd.some(o=>o.includes('snack')),`${yd.length} đơn`);
+    /* ---- Z. Không khí net Việt (v5.1) ---- */
+  fresh();const z=seat();z.hunger=z.thirst=-1e9;
+  ok('Z1. Khách đang chơi thỉnh thoảng phản ứng bằng biểu tượng',until(()=>!!z.emo,300)&&!!AMB[z.emo.k]);
+  z.emo={k:'lag',until:S.time+4,txt:line('amb_lag')};
+  ok('Z2. Trên bản đồ chỉ hiện biểu tượng, không có chữ',(bubbleOf(z)||{}).html==='📶');
+  ok('Z3. Bấm vào khách mới thấy câu nói + biệt danh',BUILD.cust(z.id).includes(esc(z.emo.txt))&&!!z.nick&&BUILD.cust(z.id).includes(esc(z.nick)));
+  giveOrder(z,[['cola']]);
+  ok('Z4. Đang gọi món thì bóng món được ưu tiên',(bubbleOf(z)||{}).cls==='order');
+  S.upg.aircon=true;const zk=ambKeys();S.upg.aircon=false;
+  ok('Z5. Có máy lạnh → không còn than nóng 🥵',!zk.includes('hot')&&ambKeys().includes('hot'));
+  ok('Z6. Chữ giá trên tường đã thay bằng bảng đen (bấm mở Đồ ăn)',!$('wallmenu')&&!!document.querySelector('[data-act="menuboard"]'));
   /* ---- BOT. Bot chơi trọn ngày ---- */
   const bt=simulateDay({});
   ok('BOT1. Bot tự nấu + giao trọn 1 ngày → kết thúc ngày',bt.done,bt.info);
