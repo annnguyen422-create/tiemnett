@@ -644,3 +644,187 @@ function loadGame(){
  try{const d=deserialize(s);if(d._migrated||fromOld)UI.migrated=true;if(d._gift)UI.gift=true;delete d._migrated;delete d._gift;
   if(fromOld){try{localStorage.setItem('tiemnet_v3_imported','1')}catch(_){}}return d}
  catch(e){try{localStorage.setItem(CFG.KEY+'_backup_'+Date.now(),s)}catch(_){}UI.saveBad=true;return null}}
+ /* ================= 4. CUSTOMERS ================= */
+function randLook(T){const l={skin:pick(LOOK.skin),hair:pick(LOOK.hair),shirt:pick(LOOK.shirt),pants:pick(LOOK.pants),style:rint(0,3),acc:wpick([0,1,2,3],x=>[4,1.5,1.5,1.5][x]),accColor:pick(LOOK.acc)};
+ if(T.id==='gamethu'&&Math.random()<.6)l.acc=3;return l}
+function newName(){for(let i=0;i<20;i++){const n=pick(SURN)+' '+pick(GIVEN);if(!S.accounts[n]&&!S.customers.some(c=>c.name===n))return n}return pick(SURN)+' '+pick(GIVEN)+' '+rint(2,99)}
+/* ---------- hàng chờ ở quầy ---------- */
+const queueList=()=>S.customers.filter(inQueue).sort((a,b)=>a.id-b.id);
+const queueIndex=c=>queueList().indexOf(c);
+/* Người đầu hàng phải đứng tới quầy rồi mới phục vụ được; người đầu còn đang đi tới thì cả hàng chờ */
+const queueFront=()=>{const q=queueList()[0];return q&&(q.state==='QUEUE'||q.state==='SERVING')?q:null};
+/* ---------- tâm trạng / kiên nhẫn ---------- */
+const moodKey=f=>f>.66?'happy':f>.4?'waiting':f>.15?'impatient':'angry';
+const MOOD_ICON={happy:'😊',waiting:'🙂',impatient:'😐',angry:'😠'};
+function moodOf(c){
+ if(inQueue(c))return{f:clamp(c.patience/c.patienceMax,0,1),ctx:'queue'};
+ if(c.state==='WAITING_FOOD')return{f:clamp(c.orderPatience/c.orderPatienceMax,0,1),ctx:'food'};
+ if(c.state==='RECHARGE'||c.rechargeReq)return{f:clamp(c.rechargePatience/c.rechargePatienceMax,0,1),ctx:'recharge'};
+ return null}
+function spawnCustomer(o){
+ o=o||{};const per=period(S.time);let acc=null;
+ if(!o.type){const names=Object.keys(S.accounts);if(names.length&&Math.random()<.35){const n=pick(names);if(!S.customers.some(c=>c.name===n))acc=S.accounts[n]}}
+ const T=o.type?CT[o.type]:acc?CT[acc.type]:wpick(CTYPES,x=>x.w[per]);
+ const money=rint(T.money[0]/1000,T.money[1]/1000)*1000,balance=acc?acc.balance:0,pat=Math.round(PAT.queue*T.pat*(S.upg.aircon?1.3:1));
+ const c={id:++S.seq.c,name:acc?acc.name:newName(),type:T.id,look:acc?acc.look:randLook(T),money,balance,returning:!!acc,
+  state:'TO_QUEUE',x:CFG.DOOR.x,y:CFG.DOOR.y,path:[],flip:false,pcId:null,patienceMax:pat,patience:pat,happiness:70,fails:0,
+  gamingTime:rint(T.play[0],T.play[1]),played:0,hunger:rint(0,45),thirst:rint(0,45),
+  preferredPC:T.prefer,preferredFood:pick(T.foods),preferredDrink:pick(T.drinks),
+  order:null,orderPatience:0,orderPatienceMax:1,lastOrderT:S.time,eatT:0,rechargeReq:0,rechargePatience:0,rechargePatienceMax:1,reqCooldown:0,
+  say:null,joke:T.id==='hocsinh'&&Math.random()<.25,askAmt:0,askText:''};
+ if(c.joke)c.gamingTime=Math.max(c.gamingTime,180);
+ let ask=rint(T.recharge[0]/10000,T.recharge[1]/10000)*10000;if(balance>=30000)ask=0;
+ c.askAmt=Math.min(ask,Math.floor(money/10000)*10000);
+ c.askText=c.joke?line('joke'):line(T.prefer==='gaming'?'ask_gaming':(Math.random()<.3?'ask_cheap':'ask'));
+ const full=queueList().length>=QUEUE_SPOTS.length;
+ S.customers.push(c);S.today.visitors++;fx.sfx('bell');
+ if(full){c.state='LEAVING';c.rated=true;c.path=[{x:110,y:540},{x:CFG.DOOR.x,y:CFG.DOOR.y}];say(c,line('queue_full'),30);S.today.left++}
+ return c}
+function maybeSpawn(dt){
+ if(NOSPAWN)return;if(S.customers.length>=S.pcs.length+9)return;
+ const p=PERIODS[period(S.time)].rate*(isWeekend(S.day)?1.3:1)*(0.6+S.rating*0.1)*dt;
+ if(Math.random()<p)spawnCustomer()}
+function moveTo(c,x,y,dt){const dx=x-c.x,dy=y-c.y,d=Math.hypot(dx,dy),st=CFG.WALK*dt;
+ if(d<=st){c.x=x;c.y=y;return true}c.x+=dx/d*st;c.y+=dy/d*st;if(Math.abs(dx)>1)c.flip=dx<0;return false}
+function moveAlong(c,dt){let st=CFG.WALK*dt;
+ while(st>0&&c.path.length){const p=c.path[0],dx=p.x-c.x,dy=p.y-c.y,d=Math.hypot(dx,dy);if(Math.abs(dx)>1)c.flip=dx<0;
+  if(d<=st){c.x=p.x;c.y=p.y;c.path.shift();st-=d}else{c.x+=dx/d*st;c.y+=dy/d*st;st=0}}
+ return!c.path.length}
+function reqAmount(c){const T=CT[c.type];const a=rint(T.recharge[0]/10000,T.recharge[1]/10000)*10000;return Math.max(0,Math.min(a,Math.floor(cashFree(c)/10000)*10000))}
+function rateVisit(c){if(c.rated)return;c.rated=true;const stars=clamp(1+c.happiness/25,1,5);
+ S.rating=clamp(S.rating*.92+stars*.08,1,5);S.today.happySum+=c.happiness;S.today.happyN++}
+function saveAccount(c){if(c.balance<1000&&!c.returning)return;const prev=S.accounts[c.name];
+ S.accounts[c.name]={name:c.name,type:c.type,look:c.look,balance:Math.floor(c.balance),visits:(prev?prev.visits:0)+1};
+ const keys=Object.keys(S.accounts);if(keys.length>40)delete S.accounts[keys[0]]}
+function assignPC(c,pc){
+ if(!c||!inQueue(c))return KE('err_cust');
+ if(!pc||pc.status!=='AVAILABLE')return KE('err_pc_busy');
+ if(c.balance<pc.hourlyRate/4)return KE('err_balance');
+ pc.status='RESERVED';pc.currentCustomer=c.id;pc.sessionTime=0;c.pcId=pc.id;c.state='TO_PC';
+ const s=seatOf(pc);c.path=[{x:CFG.AISLE_X,y:c.y},{x:CFG.AISLE_X,y:s.y},{x:s.x,y:s.y}];
+ const diff=PC_TIERS[pc.tier].rank-PC_TIERS[c.preferredPC].rank;
+ if(diff<0){c.happiness-=(CT[c.type].strict?18:8)*-diff;say(c,line('low_tier'))}else c.happiness+=diff>0?4:6;
+ if(c.patience>c.patienceMax*.6)c.happiness+=4;
+ if(S.upg.monitor)c.happiness+=CT[c.type].strict?10:6;if(S.upg.chairs){c.happiness+=5;c.gamingTime=Math.round(c.gamingTime*1.2)}
+ c.happiness=clamp(c.happiness,0,100);return KO('ASSIGN')}
+function checkout(c){
+ if(c.state==='LEAVING')return;const wasSeated=isSeated(c);
+ const pc=c.pcId?pcById(c.pcId):null;
+ if(pc&&pc.currentCustomer===c.id){pc.status='AVAILABLE';pc.currentCustomer=null;pc.sessionTime=0}
+ c.order=null;c.rechargeReq=0;c.pcId=null;if(wasSeated)S.today.served++;rateVisit(c);saveAccount(c);
+ c.path=[{x:CFG.AISLE_X,y:c.y},{x:CFG.AISLE_X,y:560},{x:CFG.DOOR.x,y:CFG.DOOR.y}];c.state='LEAVING';fx.sfx('pop')}
+function leave(c,noRate){if(c.state==='LEAVING')return;c.state='LEAVING';c.path=[{x:110,y:540},{x:CFG.DOOR.x,y:CFG.DOOR.y}];
+ if(noRate)c.rated=true;else rateVisit(c);if(c.returning||c.balance>=1000)saveAccount(c)}
+function sendHome(c){if(c.state==='LEAVING')return;if(inQueue(c))leave(c,true);else checkout(c)}
+/* ---------- gọi món ---------- */
+/* Kiên nhẫn chờ món = (nền + tổng thời gian từng món) × hệ số số món × tính cách khách × máy lạnh */
+function orderPatienceFor(items,T){const b=items.reduce((s,it)=>s+budgetOf(it),PAT.orderBase),multi=PAT.multi[Math.min(items.length,3)];
+ return Math.round(b*multi*T.pat*(S.upg.aircon?1.15:1))}
+/* Chỉ gọi món đã mở · ưu tiên món mới trong ngày · giới hạn số món theo ngày · đủ thời gian chơi còn lại */
+function maybeOrder(c,force){
+ const T=CT[c.type],open=r=>!!(MENU_BY[r]&&isOpenType(MENU_BY[r].type)),intro=introTypes(S.day);
+ let items=[],budget=c.money,skipped=false;
+ const add=(r,top)=>{if(!open(r))return false;const ratio=priceOf(r)/MENU_BY[r].price;
+  if(!force&&ratio>1&&Math.random()<Math.min(.9,(ratio-1)*1.2)){skipped=true;return false}
+  const it={r,top:top||[],done:false},p=itemPrice(it);if(p<=budget){items.push(it);budget-=p;return true}return false};
+ const choose=(pref,list)=>{const nw=list.filter(r=>intro.includes(MENU_BY[r].type));if(nw.length&&Math.random()<.6)return pick(nw);return open(pref)&&Math.random()<.6?pref:pick(list)};
+ const foods=T.foods.filter(open),drinks=T.drinks.filter(open);
+ if((c.hunger>=60||force)&&foods.length){const f=choose(c.preferredFood,foods),top=[];
+  if(MENU_BY[f].type==='noodle'){if(Math.random()<.55)top.push(pick(TOP_IDS));if(Math.random()<.15){const x=pick(TOP_IDS);if(!top.includes(x))top.push(x)}}
+  if(!add(f,top))add(f,[]);const fr=['cavien','bovien','tomvien','xx_chien','holo'].filter(open);if(fr.length&&Math.random()<.2)add(pick(fr),[])}
+ if(drinks.length&&(c.thirst>=60||(c.hunger>=60&&!foods.length)||(force&&!items.length)||(items.length&&Math.random()<.5)))add(choose(c.preferredDrink,drinks),[]);
+ c.lastOrderT=S.time;
+ const mx=maxItemsOn(S.day);if(items.length>mx)items=items.slice(0,mx);
+ if(!force){const left=c.gamingTime-c.played,need=()=>items.reduce((s,it)=>s+budgetOf(it),0)+15;
+  while(items.length&&need()>left){let k=0;items.forEach((it,i)=>{if(budgetOf(it)>budgetOf(items[k]))k=i});items.splice(k,1)}}
+ if(!items.length){if(skipped)say(c,line('pricey'),10);return false}
+ c.order={id:++S.seq.order,items,t:S.time};c.state='WAITING_FOOD';
+ c.orderPatienceMax=orderPatienceFor(items,T);c.orderPatience=c.orderPatienceMax;
+ S.today.orders++;say(c,line('order'),8);fx.sfx('notify');return true}
+function finishOrderIfDone(c){if(c.order&&c.order.items.every(i=>i.done)){c.order=null;c.lastOrderT=S.time;
+ if(c.state==='WAITING_FOOD'){c.state='EATING';c.eatT=15}say(c,line('thanks'),12)}}
+function failOrder(c){
+ c.order=null;c.fails=(c.fails||0)+1;c.happiness=clamp(c.happiness-25,0,100);S.today.ordersFailed++;
+ c.state='PLAYING';c.lastOrderT=S.time;c.hunger=Math.min(c.hunger,40);c.thirst=Math.min(c.thirst,40);
+ if(c.fails>=PAT.failLeave||c.happiness<20){say(c,line('angry_leave'),30);S.today.left++;checkout(c)}else say(c,line('angry_food'),20)}
+function markOOS(cid,i){
+ const c=custById(cid);if(!c||!c.order)return;const it=c.order.items[i];if(!it||it.done)return;
+ c.order.items.splice(i,1);c.happiness=clamp(c.happiness-5,0,100);say(c,line('oos'),12);fx.toast(t('toast_oos',{item:menuName(it.r)}));
+ if(!c.order.items.length){c.order=null;c.lastOrderT=S.time;if(c.state==='WAITING_FOOD')c.state='PLAYING'}else finishOrderIfDone(c)}
+/* ---------- mỗi phút game của khách đang ngồi máy ----------
+   Hết giờ chơi / hết tiền máy mà còn món đang chờ → ngồi chờ tiếp, không tính tiền máy */
+function seatedTick(c,dt){
+ const T=CT[c.type],pc=pcById(c.pcId);if(!pc){checkout(c);return}
+ const pending=!!(c.order&&c.order.items.some(i=>!i.done)),timeUp=c.played>=c.gamingTime,cost=pc.hourlyRate/60*dt,playing=!timeUp&&c.balance>=cost;
+ if(!playing&&!pending){
+  if(timeUp){say(c,line('bye'),30);checkout(c);return}
+  c.balance=0;const amt=c.rechargeReq||reqAmount(c);
+  if(amt>0){c.rechargeReq=amt;c.state='RECHARGE';c.rechargePatienceMax=Math.round(PAT.recharge*T.pat);
+   c.rechargePatience=Math.max(c.rechargePatience,c.rechargePatienceMax*.6);say(c,line(c.joke?'more':'recharge',{amt:vk(amt)}))}
+  else{say(c,line('broke'),30);checkout(c)}return}
+ if(playing){c.balance-=cost;pc.revenue+=cost;pc.sessionTime+=dt;S.today.pcUsage+=cost;S.today.pcMinutes+=dt;c.played+=dt;c.hunger+=T.hunger*.7*dt;c.thirst+=T.thirst*.7*dt}
+ c.waitOnly=!playing;
+ if(c.state==='EATING'){c.eatT-=dt;if(c.eatT<=0)c.state=c.order?'WAITING_FOOD':'PLAYING'}
+ else if(c.state==='WAITING_FOOD'){
+  const ready=orderReady(c),m0=moodKey(c.orderPatience/c.orderPatienceMax);
+  c.orderPatience-=dt*(ready?PAT.drainReady:playing?PAT.drainPlaying:PAT.drainWait);
+  const m1=moodKey(c.orderPatience/c.orderPatienceMax);
+  if(m1!==m0){if(m1==='impatient')say(c,line(ready?'ready_wait':'impatient'),12);else if(m1==='angry')say(c,line(ready?'ready_wait':'angry_food'),12)}
+  if(c.orderPatience<=0){failOrder(c);return}}
+ else if(playing&&c.state==='PLAYING'&&!c.order&&S.phase==='OPEN'&&S.time-c.lastOrderT>=25&&(c.hunger>=60||c.thirst>=60))maybeOrder(c,false);
+ if(!playing)return;
+ if(c.rechargeReq){c.rechargePatience-=dt*.7;if(c.rechargePatience<=0){c.rechargeReq=0;c.reqCooldown=S.time+60;c.happiness=clamp(c.happiness-10,0,100)}}
+ else if(c.balance<pc.hourlyRate/60*12&&c.played<c.gamingTime-20&&S.time>=c.reqCooldown){
+  const amt=reqAmount(c);
+  if(amt>0){c.rechargeReq=amt;c.rechargePatienceMax=Math.round(PAT.recharge*T.pat);c.rechargePatience=c.rechargePatienceMax;say(c,line(c.joke?'more':'recharge',{amt:vk(amt)}));fx.sfx('notify')}
+  else c.reqCooldown=S.time+60}}
+function updCustomer(c,dt){
+ switch(c.state){
+  case'TO_QUEUE':case'QUEUE':case'SERVING':{
+   const i=queueIndex(c),sp=QUEUE_SPOTS[Math.min(Math.max(i,0),QUEUE_SPOTS.length-1)];
+   const arrived=moveTo(c,sp.x,sp.y,dt);
+   if(c.state==='TO_QUEUE'&&arrived)c.state='QUEUE';
+   if(c.state==='SERVING'&&SERVING!==c.id&&!(S.staff&&S.staff.type==='cashier'&&S.staff.serving===c.id))c.state='QUEUE';
+   if(c.state!=='SERVING'){c.patience-=dt*PAT.drainQueue;
+    if(c.patience<=0){c.happiness=clamp(c.happiness-40,0,100);say(c,line('angry_wait'),30);S.today.left++;leave(c)}}
+   break}
+  case'TO_PC':if(moveAlong(c,dt)){const pc=pcById(c.pcId);if(pc)pc.status='OCCUPIED';c.state='PLAYING';c.lastOrderT=S.time;c.flip=false;fx.sfx('pop')}break;
+  case'PLAYING':case'WAITING_FOOD':case'EATING':seatedTick(c,dt);break;
+  case'RECHARGE':c.rechargePatience-=dt;if(c.rechargePatience<=0){c.happiness=clamp(c.happiness-20,0,100);say(c,line('broke'),30);checkout(c)}break;
+  case'LEAVING':if(moveAlong(c,dt))c.gone=true;break}
+ if(c.say&&S.time>c.say.until)c.say=null}
+
+/* ================= 4. DAY LOOP ================= */
+function openShop(){if(S.phase!=='PREP')return false;S.phase='OPEN';S.time=CFG.OPEN;fx.sfx('bell');fx.toast(t('toast_open'),'ok');
+ if(!TEST&&!NOSPAWN)spawnCustomer();return true}
+function stepSim(dt){
+ if(S.phase!=='OPEN'&&S.phase!=='CLOSING')return;
+ if(S.phase==='OPEN'){S.time=Math.min(CFG.CLOSE,S.time+dt);if(S.time<CFG.LAST_ENTRY)maybeSpawn(dt);
+  if(!S.today.warned&&S.time>=1350){S.today.warned=true;fx.toast(t('toast_last'))}}
+ stationTick(dt);
+ for(const c of S.customers)updCustomer(c,dt);
+ S.customers=S.customers.filter(c=>!c.gone);
+ if(S.phase==='OPEN'&&S.time>=CFG.CLOSE){S.phase='CLOSING';for(const c of S.customers)sendHome(c);fx.toast(t('toast_closing'))}
+ if(S.phase==='CLOSING'&&!S.customers.length){endDay();if(!TEST)saveGame()}}
+function endDay(){
+ if(S.phase==='REPORT')return S.report;
+ const d=S.today,u=S.upg||{},elec=CFG.ELEC_BASE+(u.aircon?20000:0)+Math.round(d.pcMinutes/60*CFG.ELEC_PC_HOUR);
+ addTx(-elec,'ELECTRICITY',t('exp_elec'));addTx(-CFG.INTERNET,'INTERNET',t('exp_net'));addTx(-CFG.MAINT,'REPAIR',t('exp_maint'));
+ let salary=0;for(const ty in(d.staffDays||{})){const s=STAFF[ty].salary;salary+=s;addTx(-s,'STAFF_SALARY',t('tx_salary',{name:t('staff_'+ty)}))}
+ const rev={recharge:d.recharge,food:d.food,drink:d.drink},revenue=d.recharge+d.food+d.drink;
+ const exp={purchases:d.purchases,elec,internet:CFG.INTERNET,maint:CFG.MAINT,salary,hire:d.hire||0,upgrade:d.upgrade||0};
+ const expense=exp.purchases+exp.elec+exp.internet+exp.maint+exp.salary+exp.hire+exp.upgrade;
+ S.report={day:S.day,rev,revenue,exp,expense,profit:revenue-expense,pcUsage:Math.round(d.pcUsage),pcHours:d.pcMinutes/60,visitors:d.visitors,
+  served:d.served,left:d.left,orders:d.orders,failed:d.ordersFailed,sat:d.happyN?Math.round(d.happySum/d.happyN):0,sold:{...d.sold}};
+ S.history.push({day:S.day,revenue,expense,profit:revenue-expense});if(S.history.length>60)S.history.shift();
+ S.phase='REPORT';S.k=emptyKitchen();S.hand=null;S.sel={};S.carry=[];S.pickup=Array(CFG.PICKUP_N).fill(null);if(S.staff){S.staff.hand=null;S.staff.serving=null}
+ return S.report}
+function nextDay(){
+ if(S.phase!=='REPORT')return false;if(S.day===1)S.tutorialDone=true;
+ S.day++;S.time=CFG.OPEN-30;S.phase='PREP';S.today=freshToday(S.money);S.tx=[];S.report=null;S.customers=[];
+ S.pcs.forEach(p=>{p.status='AVAILABLE';p.currentCustomer=null;p.sessionTime=0});
+ S.today.staffDays=S.staff?{[S.staff.type]:true}:{};expireLots();return true}
+function forecast(){
+ const m=(0.6+S.rating*0.1)*(isWeekend(S.day)?1.3:1);const base=PERIODS.reduce((a,p,i)=>a+p.rate*(i===4?60:p.min),0)*m;
+ const lo=Math.round(base*.85),hi=Math.round(base*1.15),r=(a,b)=>[Math.round(lo*a),Math.round(hi*b)];
+ return{cust:[lo,hi],noodle:r(.35,.5),fried:r(.15,.3),drink:r(.5,.75)}}
