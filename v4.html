@@ -1826,6 +1826,101 @@ function init(){
  if(fresh){UI.prepShown=true;openSheet('welcome')}
  if(/[?&]test\b/.test(location.search)){UI.testRes=runAllTests();openSheet('tests')}
  requestAnimationFrame(n=>{last=n;frame(n)})}
+ /* ================= PATCH B — SỬA LỖI LOGIC ================= */
+Object.assign(STR.vi,{err_wrong_top:'Món trên khay không đúng topping. Khách gọi: {item}.'});
+Object.assign(DIALOGUE.vi,{wrong_top:['Không đúng món em gọi anh ơi.','Em gọi khác topping mà anh...']});
+const budgetOf=it=>PAT.budget[MENU_BY[it.r].type]||30;
+/* Đơn nhiều món: chờ lâu hơn (2 món ×1,15 · 3 món ×1,3) */
+function orderPatienceFor(items,T){const b=items.reduce((s,it)=>s+budgetOf(it),PAT.orderBase),multi=[1,1,1.15,1.3][Math.min(items.length,3)];
+ return Math.round(b*multi*T.pat*(S.upg.aircon?1.15:1))}
+/* Chỉ gọi món nếu thời gian chơi còn lại đủ cho món đó */
+function maybeOrder(c,force){
+ const T=CT[c.type];let items=[],budget=c.money,skipped=false;
+ const add=(r,top)=>{if(!MENU_BY[r])return false;const ratio=priceOf(r)/MENU_BY[r].price;
+  if(!force&&ratio>1&&Math.random()<Math.min(.9,(ratio-1)*1.2)){skipped=true;return false}
+  const it={r,top:top||[],done:false},p=itemPrice(it);if(p<=budget){items.push(it);budget-=p;return true}return false};
+ if(c.hunger>=60||force){const f=(MENU_BY[c.preferredFood]&&Math.random()<.6)?c.preferredFood:pick(T.foods);const top=[];
+  if(MENU_BY[f]&&MENU_BY[f].type==='noodle'){if(Math.random()<.55)top.push(pick(TOP_IDS));if(Math.random()<.15){const x=pick(TOP_IDS);if(!top.includes(x))top.push(x)}}
+  if(!add(f,top))add(f,[]);if(Math.random()<.2)add(pick(['cavien','bovien','tomvien','xx_chien','holo']),[])}
+ if(c.thirst>=60||(items.length&&Math.random()<.5))add((MENU_BY[c.preferredDrink]&&Math.random()<.6)?c.preferredDrink:pick(T.drinks),[]);
+ c.lastOrderT=S.time;
+ if(!force){const left=c.gamingTime-c.played,need=()=>items.reduce((s,it)=>s+budgetOf(it),0)+15;
+  while(items.length&&need()>left){let k=0;items.forEach((it,i)=>{if(budgetOf(it)>budgetOf(items[k]))k=i});items.splice(k,1)}}
+ if(!items.length){if(skipped)say(c,line('pricey'),10);return false}
+ c.order={id:++S.seq.order,items,t:S.time};c.state='WAITING_FOOD';
+ c.orderPatienceMax=orderPatienceFor(items,T);c.orderPatience=c.orderPatienceMax;
+ S.today.orders++;say(c,line('order'),8);fx.sfx('notify');return true}
+/* Hết giờ chơi / hết tiền máy mà còn món đang chờ → ngồi chờ tiếp, không tính tiền máy */
+function seatedTick(c,dt){
+ const T=CT[c.type],pc=pcById(c.pcId);if(!pc){checkout(c);return}
+ const pending=!!(c.order&&c.order.items.some(i=>!i.done)),timeUp=c.played>=c.gamingTime,cost=pc.hourlyRate/60*dt,playing=!timeUp&&c.balance>=cost;
+ if(!playing&&!pending){
+  if(timeUp){say(c,line('bye'),30);checkout(c);return}
+  c.balance=0;const amt=c.rechargeReq||reqAmount(c);
+  if(amt>0){c.rechargeReq=amt;c.state='RECHARGE';c.rechargePatienceMax=Math.round(PAT.recharge*T.pat);
+   c.rechargePatience=Math.max(c.rechargePatience,c.rechargePatienceMax*.6);say(c,line(c.joke?'more':'recharge',{amt:vk(amt)}))}
+  else{say(c,line('broke'),30);checkout(c)}return}
+ if(playing){c.balance-=cost;pc.revenue+=cost;pc.sessionTime+=dt;S.today.pcUsage+=cost;S.today.pcMinutes+=dt;c.played+=dt;c.hunger+=T.hunger*.7*dt;c.thirst+=T.thirst*.7*dt}
+ c.waitOnly=!playing;
+ if(c.state==='EATING'){c.eatT-=dt;if(c.eatT<=0)c.state=c.order?'WAITING_FOOD':'PLAYING'}
+ else if(c.state==='WAITING_FOOD'){
+  const ready=orderReady(c),m0=moodKey(c.orderPatience/c.orderPatienceMax);
+  c.orderPatience-=dt*(ready?PAT.drainReady:playing?PAT.drainPlaying:1);
+  const m1=moodKey(c.orderPatience/c.orderPatienceMax);
+  if(m1!==m0){if(m1==='impatient')say(c,line(ready?'ready_wait':'impatient'),12);else if(m1==='angry')say(c,line(ready?'ready_wait':'angry_food'),12)}
+  if(c.orderPatience<=0){failOrder(c);return}}
+ else if(playing&&c.state==='PLAYING'&&!c.order&&S.phase==='OPEN'&&S.time-c.lastOrderT>=25&&(c.hunger>=60||c.thirst>=60))maybeOrder(c,false);
+ if(!playing)return;
+ if(c.rechargeReq){c.rechargePatience-=dt*.7;if(c.rechargePatience<=0){c.rechargeReq=0;c.reqCooldown=S.time+60;c.happiness=clamp(c.happiness-10,0,100)}}
+ else if(c.balance<pc.hourlyRate/60*12&&c.played<c.gamingTime-20&&S.time>=c.reqCooldown){
+  const amt=reqAmount(c);
+  if(amt>0){c.rechargeReq=amt;c.rechargePatienceMax=Math.round(PAT.recharge*T.pat);c.rechargePatience=c.rechargePatienceMax;say(c,line(c.joke?'more':'recharge',{amt:vk(amt)}));fx.sfx('notify')}
+  else c.reqCooldown=S.time+60}}
+/* Ghép món ↔ khách: món đã xong phải ĐÚNG Y topping; tô còn trên Bàn sơ chế thì được ghép nếu chưa dư topping */
+function matchAll(){
+ const units=[],push=(obj,src,stage)=>{const u=unitOf(obj);if(u)units.push({obj,src,r:u.r,top:u.top,stage:stage!=null?stage:u.stage,
+  open:!!(obj&&obj.cat==='noodle'&&(obj.k==='prep'||obj.k==='raw'))})};
+ S.carry.forEach(d=>push(d,'carry',9));S.pickup.forEach(d=>d&&push(d,'pickup',8));
+ for(const st in S.k)S.k[st].forEach(w=>w&&push(w,st));
+ push(S.hand,'hand');if(S.staff){push(S.staff.hand,'cook');if(S.staff.ph)push(S.staff.ph,'hand')}
+ const orders=[];for(const c of S.customers)if(c.order&&c.state!=='LEAVING')c.order.items.forEach((it,i)=>{if(!it.done)orders.push({c,it,i,t:c.order.t})});
+ orders.sort((a,b)=>a.t-b.t||a.c.id-b.c.id);
+ const byObj=new Map();
+ for(const o of orders){let best=null,bs=-1;const ot=o.it.top||[];
+  for(const u of units){if(u.o||u.r!==o.it.r)continue;const ut=u.top||[],ex=sameTop(ot,ut);
+   if(!ex&&!(u.open&&ut.every(x=>ot.includes(x))))continue;
+   const sc=u.stage*10+(ex?5:0);if(sc>bs){bs=sc;best=u}}
+  if(best){best.o=o;o.u=best;byObj.set(best.obj,o)}}
+ return{orders,units,byObj}}
+/* Giao: chỉ nhận món đúng y topping */
+function deliverTo(c){
+ const res={n:0,earned:0,gain:0,minQ:100};let wrong=null;if(!c||!c.order||!isSeated(c))return res;
+ for(const it of c.order.items){if(it.done)continue;
+  let k=-1,best=-1;S.carry.forEach((d,j)=>{if(d.r!==it.r)return;if(!sameTop(it.top,d.top)){if(!wrong)wrong=it;return}if(d.q>best){best=d.q;k=j}});
+  if(k<0)continue;
+  const d=S.carry.splice(k,1)[0];it.done=true;const R=MENU_BY[it.r],price=itemPrice(it);
+  c.money=Math.max(0,c.money-price);addTx(price,R.kind==='food'?'FOOD_SALE':'DRINK_SALE',dishLabel(it)+' — '+c.name);
+  S.today[R.kind]+=price;S.today.sold[it.r]=(S.today.sold[it.r]||0)+1;if(R.kind==='food')c.hunger=0;else c.thirst=0;
+  const q=d.q;res.gain+=q>=90?8:q>=70?4:q>=50?0:-8;res.minQ=Math.min(res.minQ,q);res.n++;res.earned+=price}
+ if(res.n){if(c.orderPatience>c.orderPatienceMax*.5)res.gain+=4;c.happiness=clamp(c.happiness+res.gain,0,100);
+  fx.sfx('cash');fx.float(c.x,c.y-80,'+'+vnd(res.earned),'#2f8a47');fx.float(c.x+24,c.y-58,(res.gain>=0?'❤ +':'💔 ')+res.gain,res.gain>=0?'#E85D5D':'#7a6f63');
+  finishOrderIfDone(c);if(res.minQ<50)say(c,line('bad'),14);else if(res.minQ<70)say(c,line('meh'),12);refreshMatch()}
+ else if(wrong){say(c,line('wrong_top'),12);fx.err('err_wrong_top',{item:dishLabel(wrong)})}
+ return res}
+/* Bảng khách: cảnh báo khi món trên khay sai topping */
+const _buildCustB=BUILD.cust;
+BUILD.cust=function(id){const h=_buildCustB(id);if(h==null)return h;const c=custById(id);
+ const bad=c&&c.order&&c.order.items.find(it=>!it.done&&S.carry.some(d=>d.r===it.r&&!sameTop(it.top,d.top))&&!S.carry.some(d=>d.r===it.r&&sameTop(it.top,d.top)));
+ return bad?`<p class="badc">${esc(t('err_wrong_top',{item:dishLabel(bad)}))}</p>`+h:h};
+function runTestsB(){
+ const R=[],ok=(n,c,i)=>R.push({n,pass:!!c,info:i||''}),saved=S,sv=SERVING;TEST=true;NOSPAWN=true;SERVING=null;
+ const until=(fn,max)=>{for(let i=0;i<(max||600)&&!fn();i++)stepSim(1);return!!fn()};
+ const seat=()=>{const c=spawnCustomer({type:'sinhvien'});c.money=500000;c.balance=200000;c.gamingTime=9999;until(()=>c.state==='QUEUE',30);
+  assignPC(c,S.pcs.find(p=>p.status==='AVAILABLE'));until(()=>c.state==='PLAYING',40);c.hunger=c.thirst=0;c.lastOrderT=S.time;return c};
+ const give=(c,items)=>{c.order={id:++S.seq.order,items:items.map(([r,top])=>({r,top:top||[],done:false})),t:S.time};c.state='WAITING_FOOD';c.orderPatienceMax=c.orderPatience=500;refreshMatch()};
+ try{
+  S=newState();S.money=S.today.startMoney=20000000;openShop();S.time=18*60;
+  const a=seat();give(a,[['mi_bo']]);a.played=a.gamingTime-1;stepSim(5);
 init();
 </script>
 </body>
