@@ -616,8 +616,7 @@ function newName(){for(let i=0;i<20;i++){const n=pick(SURN)+' '+pick(GIVEN);if(!
 /* ---------- hàng chờ ở quầy ---------- */
 const queueList=()=>S.customers.filter(inQueue).sort((a,b)=>a.id-b.id);
 const queueIndex=c=>queueList().indexOf(c);
-const queueFront=()=>queueList().find(c=>c.state==='QUEUE'||c.state==='SERVING')||null;
-/* ---------- tâm trạng / kiên nhẫn ---------- */
+const queueFront=()=>{const q=queueList()[0];return q&&(q.state==='QUEUE'||q.state==='SERVING')?q:null};/* ---------- tâm trạng / kiên nhẫn ---------- */
 const moodKey=f=>f>.66?'happy':f>.4?'waiting':f>.15?'impatient':'angry';
 const MOOD_ICON={happy:'😊',waiting:'🙂',impatient:'😐',angry:'😠'};
 function moodOf(c){
@@ -916,8 +915,7 @@ function matchAll(){
   if(best){best.o=o;o.u=best;byObj.set(best.obj,o)}}
  return{orders,units,byObj}}
 function refreshMatch(){MATCH=matchAll();return MATCH}
-function orderReady(c){const m=MATCH||matchAll();return m.orders.some(o=>o.c===c&&o.u&&(o.u.src==='carry'||o.u.src==='pickup'))}
-function itemStatus(c,i){const it=c.order&&c.order.items[i];if(!it)return'os_todo';if(it.done)return'os_done';
+function orderReady(c){const m=refreshMatch();return m.orders.some(o=>o.c===c&&o.u&&(o.u.src==='carry'||o.u.src==='pickup'))}function itemStatus(c,i){const it=c.order&&c.order.items[i];if(!it)return'os_todo';if(it.done)return'os_done';
  const m=MATCH||matchAll(),o=m.orders.find(x=>x.c===c&&x.i===i);if(!o||!o.u)return'os_todo';
  return{carry:'os_carry',pickup:'os_pickup',stove:'os_cooking',board:'os_prep',fryer:'os_frying',bar:'os_mixing',hand:'os_hand',cook:'os_hand'}[o.u.src]||'os_todo'}
 
