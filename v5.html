@@ -1383,3 +1383,221 @@ function renderKBar(){
   if(row._k!==rk){row._k=rk;row.innerHTML=to?`<span class="tg btn" data-nx="${to}" role="button">${t('nx_prefix')} <b>${esc(nx.msg)}</b> ➜</span>`:`<span class="tg">${t('nx_prefix')} <b>${esc(nx.msg)}</b></span>`}}
  kb.querySelectorAll('.kpb').forEach(el=>{if(el.dataset.p){const[s,i]=el.dataset.p.split(':'),w=S.k[s][+i],p=s==='stove'?COOK.noodle:COOK.fried,b=el.querySelector('b');if(w&&b)b.style.left=Math.min(100,w.t/(p.T+p.ruin)*100)+'%'}
   else{const[s,i]=el.dataset.q.split(':'),w=S.k[s][+i],z=el.querySelector('.zb');if(w&&z)z.style.width=Math.min(100,w.t/(w.k==='prep'?PREP[w.cat]:COOK.shake)*100)+'%'}})}
+ /* ================= 8. INPUT ================= */
+function walkTo(x,y,cb){UI.walk={x,y,cb};UI.at=null}
+function walkToFn(fn,cb,fail){UI.walk={fn,cb,fail};UI.at=null}
+function movePlayer(dt){const w=UI.walk;if(!w)return;let tx=w.x,ty=w.y;
+ if(w.fn){const p=w.fn();if(!p){UI.walk=null;if(w.fail)w.fail();return}tx=p.x;ty=p.y}
+ const p=S.player,dx=tx-p.x,dy=ty-p.y,d=Math.hypot(dx,dy),st=CFG.PLAYER_SPEED*dt;if(Math.abs(dx)>1)p.flip=dx<0;
+ if(d<=st){p.x=tx;p.y=ty;UI.walk=null;if(w.cb)w.cb()}else{p.x+=dx/d*st;p.y+=dy/d*st}}
+function custSpot(c){if(!c||c.state==='LEAVING')return null;if(isSeated(c)){const s=seatOf(pcById(c.pcId));return{x:s.x+36,y:s.y-2}}return{x:c.x+30,y:c.y}}
+const stSpot=st=>st==='pickup'?CFG.PICKUP_SPOT:KIT[st]?{x:KIT[st].x+KIT[st].w/2,y:CFG.KIT_Y}:null;
+function uiK(r){if(!r)return r;if(!r.ok){fx.err(r.err,r.v);return r}refreshMatch();
+ const bad=r.step==='RUINED'||r.step==='BAD_MIX';fx.float(S.player.x,S.player.y-64,t('step_'+r.step),bad?'#c94141':'#303030');
+ fx.sfx({PUT_IN_FRYER:'fry',COOK:'fry',RUINED:'error',BAD_MIX:'error',DONE:'ding',TAKE_OUT:'ding',PLACE:'step',PLATE:'step'}[r.step]||'pop');return r}
+function doAssign(c,pc){if(!c||!pc)return;const r=assignPC(c,pc);if(!r.ok){fx.err(r.err);return}
+ fx.toast(t('toast_assigned',{name:c.name,id:pad(pc.id)}),'ok');fx.sfx('pop');closeSheet()}
+function serveQueue(){const f=queueFront();if(!f){fx.toast(t('err_no_queue'));return}
+ if(S.staff&&S.staff.serving===f.id)return;
+ walkTo(CFG.COUNTER_SPOT.x,CFG.COUNTER_SPOT.y,()=>{const ff=queueFront();if(ff)openSheet('counter',ff.id)})}
+/* Giao món: đi lấy món ở Quầy ra món (nếu cần) rồi bám theo đúng khách để giao */
+function startDelivery(c){
+ if(!c||!isSeated(c)||!c.order){fx.err('err_nothing_ready');return}
+ const m=refreshMatch(),mine=d=>{const o=d&&m.byObj.get(d);return!!(o&&o.c===c)};
+ const inCarry=S.carry.some(mine),inPU=S.pickup.some(mine);if(!inCarry&&!inPU){fx.err('err_nothing_ready');return}
+ const go=()=>walkToFn(()=>{const cc=custById(c.id);return cc&&isSeated(cc)?custSpot(cc):null},
+  ()=>{const cc=custById(c.id),r=deliverTo(cc);if(r.n){fx.toast(t('toast_deliver',{n:r.n,money:vnd(r.earned)}),'ok')}else if(!S.carry.length)fx.err('err_nothing_ready')},
+  ()=>{fx.err('err_cust_gone');refreshMatch()});
+ if(inPU)walkTo(CFG.PICKUP_SPOT.x,CFG.PICKUP_SPOT.y,()=>{if(collectFor(c))uiK(KO('COLLECT'));go()});else go()}
+function pickupAction(i){const d=S.pickup[i];if(d){const o=refreshMatch().byObj.get(d);if(o){startDelivery(o.c);return}}uiK(kTap('pickup',i))}
+function onWorld(e){
+ const el=e.target.closest('[data-act]');
+ if(UI.sheet&&UI.sheet.kind==='counter'&&el&&el.dataset.act==='pc'){const pc=pcById(+el.dataset.id),c=custById(UI.sheet.id);if(pc&&c&&pc.status==='AVAILABLE'){doAssign(c,pc);return}}
+ if(!el||S.phase==='REPORT')return;
+ const act=el.dataset.act,id=el.dataset.id;
+ if(act==='pc'){openSheet('pc',+id);return}
+ if(S.paused){fx.err('err_paused');return}
+ if(UI.sheet&&UI.sheet.kind==='counter')closeSheet();
+ if(act==='cust'){const c=custById(+id);if(!c)return;
+  if(inQueue(c)){const f=queueFront();if(f&&f!==c)fx.toast(t('err_not_front'));serveQueue();return}
+  if(isSeated(c)){if(canDeliverTo(c))startDelivery(c);else openSheet('cust',c.id)}return}
+ if(act==='counter'){serveQueue();return}
+ if(act==='storage'){walkTo(CFG.STORAGE_SPOT.x,CFG.STORAGE_SPOT.y,()=>openSheet('inv'));return}
+ if(act==='kst'||act==='spot'||act==='bin'){
+  const parts=String(id).split(':'),st=parts[0];
+  if(S.phase!=='OPEN'&&S.phase!=='CLOSING'){fx.err('err_closed');return}
+  if(st==='pickup'&&!hasPickup())return;
+  const run=()=>{UI.at=st;
+   if(act==='spot'){if(st==='pickup')pickupAction(+parts[1]);else uiK(kTap(st,+parts[1]))}
+   else if(act==='bin')uiK(kBin(st,parts[1]));
+   else if(st==='trash'&&S.hand)uiK(kTrash());
+   else if(st==='pickup'&&S.carry.length){const i=S.pickup.indexOf(null);if(i>=0)uiK(kTap('pickup',i))}};
+  if(UI.at===st&&!UI.walk)run();else{const sp=stSpot(st);walkTo(sp.x,sp.y,run)}}}
+
+/* ================= 8. SHEETS ================= */
+const stat=(l,v)=>`<div class="stat"><small>${l}</small><b>${v}</b></div>`;
+const emptyBox=k=>`<div class="empty"><b>${t(k+'_empty_t')}</b><p>${t(k+'_empty_d')}</p></div>`;
+const rowKV=(k,v)=>`<div class="row"><span>${k}</span><b>${v}</b></div>`;
+const L3=(l,v,neg)=>`<div class="row"><span>${l}</span><b class="${neg?'badc':'okc'}">${neg?'-':'+'}${vnd(v)}</b></div>`;
+function custHead(c){return`<div class="head">${charSVG(c.look,{mood:c.happiness>65?2:c.happiness>35?1:0,s:.9})}<div><b>${esc(c.name)}</b><div class="muted">${CT[c.type].name}${c.returning?` · <span class="badge acc">${t('returning')}</span>`:''}</div></div></div>`}
+function rcButtons(hl){return CFG.RECHARGE_OPTIONS.map(a=>`<button data-ui="rc" data-a="${a}" class="${a===hl?'pri':''}">${vk(a)}</button>`).join('')+`<button data-ui="rcx">${t('custom')}</button>`}
+function eqLine(c){const r=UI.lastRc;return r&&r.id===c.id?`<div class="eq">${vnd(r.before)} + ${vnd(r.amt)} = <b>${vnd(r.after)}</b></div>`:''}
+function moodRow(c){const mo=moodOf(c);if(!mo)return'';const k=moodKey(mo.f);return rowKV(t('mood'),`${MOOD_ICON[k]} ${t('mood_'+k)} · ${Math.round(mo.f*100)}%`)}
+/* Khung "Món mới hôm nay" ở bảng chuẩn bị đầu ngày */
+function newDishCard(){const it=introTypes(S.day),nx=introTypes(S.day+1);if(!it.length&&!nx.length)return'';
+ let h='';if(it.length)h+=`<div class="card ndcard"><h4>🆕 ${t('nd_title')}</h4>${it.map(tp=>`<div><b>${t('nd_'+tp+'_t')}</b><div class="ndic">${MENU.filter(m=>m.type===tp).map(m=>wiSVG({k:'dish',r:m.id,top:[]},28)).join('')}</div><ol>${t('nd_'+tp).map(s=>`<li>${esc(s)}</li>`).join('')}</ol>${tp==='mix'?`<p class="muted">${t('nd_mix_recipes')}</p>`:''}</div>`).join('')}</div>`;
+ if(nx.length)h+=`<p class="muted">${t('nd_next',{x:nx.map(tp=>t('nd_'+tp+'_t')).join(', ')})}</p>`;return h}
+const BUILD={
+ counter(id){const c=custById(id);if(!c||!inQueue(c))return null;
+  const free=S.pcs.filter(p=>p.status==='AVAILABLE').sort((a,b)=>(b.tier===c.preferredPC)-(a.tier===c.preferredPC)||a.id-b.id);
+  return`${custHead(c)}<p class="say">“${esc(c.askText)}”</p>${rowKV(t('balance'),vnd(c.balance))}${eqLine(c)}
+  <p class="muted">${t('wants',{tier:PC_TIERS[c.preferredPC].name,amt:c.askAmt?vk(c.askAmt):t('no_recharge')})}</p>
+  <h4>${t('recharge')}</h4><div class="grid">${rcButtons(c.askAmt)}</div><h4>${t('choose_pc')}</h4>
+  ${free.length?`<div class="grid">${free.map(p=>`<button data-ui="assign" data-a="${p.id}" class="${p.tier===c.preferredPC?'ok':''}">#${pad(p.id)} ${PC_TIERS[p.tier].name}<small>${vk(p.hourlyRate)}${t('per_hour')}${p.tier===c.preferredPC?' · ★':''}</small></button>`).join('')}</div><p class="muted">${t('map_tip')}</p>`:`<p class="empty">${t('no_pc')}</p>`}`},
+ cust(id){const c=custById(id);if(!c||!isSeated(c))return null;const pc=pcById(c.pcId);refreshMatch();
+  const bad=c.order&&c.order.items.find(it=>!it.done&&S.carry.some(d=>d.r===it.r&&!sameTop(it.top,d.top))&&!S.carry.some(d=>d.r===it.r&&sameTop(it.top,d.top)));
+  const ord=c.order?`<h4>${t('order')} #${c.order.id}</h4>`+c.order.items.map((it,i)=>{const s=itemStatus(c,i),ready=s==='os_carry'||s==='os_pickup';
+   const act=it.done?`<span class="badge ok">✓ ${t('delivered')}</span>`:ready?`<button class="sm go" data-ui="deliver" data-a="${c.id}">${t('btn_deliver')} ➜</button>`
+    :`<span class="badge ${s==='os_todo'?'':'wip'}">${t(s)}</span>${s==='os_todo'&&!hasStockFor(it.r)?` <button class="sm" data-ui="oos" data-a="${c.id}|${i}">${t('btn_oos')}</button>`:''}`;
+   return`<div class="oitem">${wiSVG({k:'dish',r:it.r,top:it.top},28)}<span class="grow">${esc(dishLabel(it))}<small class="muted"> · ${vk(itemPrice(it))}</small></span>${act}</div>`}).join(''):'';
+  return`${bad?`<p class="badc">${esc(t('err_wrong_top',{item:dishLabel(bad)}))}</p>`:''}${custHead(c)}${rowKV(t('state'),t('cs_'+c.state))}${moodRow(c)}${rowKV('PC',`#${pad(pc.id)} ${PC_TIERS[pc.tier].name}`)}${rowKV(t('played'),dur(c.played))}${rowKV(t('balance'),vnd(c.balance))}${eqLine(c)}${ord}
+  <h4>${t('recharge')} ${c.rechargeReq?`<span class="badge warn">${esc(t('b_recharge',{amt:vk(c.rechargeReq)}))}</span>`:''}</h4><div class="grid">${rcButtons(c.rechargeReq)}</div>`},
+ pc(id){const p=pcById(id);if(!p)return null;const c=p.currentCustomer?custById(p.currentCustomer):null;
+  return`<h3>PC #${pad(p.id)} · ${PC_TIERS[p.tier].name}</h3>${rowKV(t('state'),ST_ICON[p.status]+' '+t('pc_'+p.status))}${rowKV(t('rate'),vnd(p.hourlyRate)+t('per_hour'))}${rowKV(t('customer'),c?esc(c.name):'—')}${rowKV(t('pc_time'),c?dur(p.sessionTime):'—')}${rowKV(t('pc_rev'),vnd(p.revenue))}
+  ${c&&isSeated(c)?`<button class="pri wide" data-ui="viewCust" data-a="${c.id}">${t('view_customer')}</button>`:''}`},
+ pcs(){return`<h3>${t('pcs_t')}</h3><div class="grid">${S.pcs.map(p=>{const c=p.currentCustomer?custById(p.currentCustomer):null;return`<button data-ui="openPc" data-a="${p.id}">#${pad(p.id)} ${PC_TIERS[p.tier].name}<small>${ST_ICON[p.status]} ${t('pc_'+p.status)}${c?' · '+esc(c.name):''}</small></button>`}).join('')}</div>`},
+ orders(){const cs=S.customers.filter(c=>c.order&&isSeated(c));refreshMatch();
+  const prow=m=>{const p=priceOf(m.id),cost=recipeCost(m.id),mg=p?Math.round((p-cost)/p*100):0,chg=p!==m.price;
+   return`<div class="prow">${wiSVG({k:'dish',r:m.id,top:[]},24)}<div class="grow"><b>${esc(menuName(m.id))}</b><small class="muted">${t('cost_short')} ${vk(cost)} · ${t('margin')} ${mg}%${chg?` · ${t('base_price')} ${vk(m.price)}`:''}</small></div><button class="sm" data-ui="price" data-a="${m.id}|-1000" aria-label="−">−</button><b class="pv ${chg?(p>m.price?'warnc':'okc'):''}">${vk(p)}</b><button class="sm" data-ui="price" data-a="${m.id}|1000" aria-label="+">+</button>${chg?`<button class="sm" data-ui="priceReset" data-a="${m.id}" aria-label="↺">↺</button>`:''}</div>`};
+  const ord=cs.length?`<h3>${t('orders_t')}</h3>`+cs.map(c=>{const mo=moodOf(c);return`<div class="card"><div class="row"><b>${esc(c.name)} · ${esc(pcLabel(c))}</b><span>${mo?MOOD_ICON[moodKey(mo.f)]:''} ${canDeliverTo(c)?`<button class="sm go" data-ui="deliver" data-a="${c.id}">${t('btn_deliver')} ➜</button>`:''}</span></div><div>${c.order.items.map((it,i)=>`<span class="pill ${it.done?'done':''}">${wiSVG({k:'dish',r:it.r,top:it.top},20)} ${esc(dishLabel(it))} · <small>${t(itemStatus(c,i))}</small></span>`).join('')}</div></div>`}).join(''):'';
+  return`${ord}<h3>${t('price_t')}</h3><p class="muted">${t('price_note')}</p>${MENU.map(prow).join('')}
+  <h4>${t('toppings_t')}</h4>${TOP_IDS.map(x=>`<div class="mrow">${binSVG('board',x,20)}<span>${t('bin_'+x)}</span><b>+${vk(TOPPINGS[x].price)}</b><small></small></div>`).join('')}`},
+ inv(){const cats=[...new Set(ITEMS.map(i=>i.cat))];for(const id in SHELF)syncLots(id);
+  return`<h3>${t('nav_inv')} <span class="muted">· ${vnd(S.money)}</span></h3>${ITEMS.every(i=>!S.inv[i.id])?emptyBox('inv'):''}${cats.map(cat=>`<h4>${cat}</h4>`+ITEMS.filter(i=>i.cat===cat).map(it=>{const st=S.inv[it.id],lots=SHELF[it.id]?(S.lots[it.id]||[]):[],soon=lots.filter(l=>l.exp<=S.day).reduce((a,l)=>a+l.n,0);
+   const lt=SHELF[it.id]?`<div class="muted">${t('shelf_life',{d:SHELF[it.id]})}${lots.length?' · '+lots.map(l=>`${l.n}: ${l.exp<=S.day?t('exp_today'):t('exp_in',{d:l.exp-S.day})}`).join(' · '):''}</div>`:'';
+   return`<div class="item"><div class="grow"><b>${esc(itemName(it.id))}</b> ${st<it.min?`<span class="badge warn">${t('low')}</span>`:''}${soon?` <span class="badge bad">${t('exp_warn',{n:soon})}</span>`:''}<div class="muted">${t('stock')}: <b>${st}</b> ${it.unit} · ${t('cost')} ${vnd(it.cost)}</div>${lt}</div><button class="sm" data-ui="buy" data-a="${it.id}|${it.pack}">+${it.pack}<small>${vk(it.cost*it.pack)}</small></button><button class="sm" data-ui="buy" data-a="${it.id}|${it.pack*3}">+${it.pack*3}<small>${vk(it.cost*it.pack*3)}</small></button></div>`}).join('')).join('')}`},
+ rev(){const d=S.today,revenue=d.recharge+d.food+d.drink;
+  if(!S.tx.length&&!S.history.length)return`<h3>${t('nav_rev')}</h3>`+emptyBox('rev');
+  const sold=Object.entries(d.sold).sort((a,b)=>b[1]-a[1]).slice(0,5),mx=sold.length?sold[0][1]:1;
+  return`<h3>${t('nav_rev')} · ${t('day',{d:S.day})}</h3><div class="stats">${stat(t('revenue'),vnd(revenue))}${stat(t('e_buy'),vnd(d.purchases))}${stat(t('visitors'),d.visitors)}${stat(t('pc_usage'),(d.pcMinutes/60).toFixed(1)+'h')}</div>
+  ${rowKV(t('r_recharge'),vnd(d.recharge))}${rowKV(t('r_food'),vnd(d.food))}${rowKV(t('r_drink'),vnd(d.drink))}
+  ${sold.length?`<h4>${t('top')}</h4>`+sold.map(([r,n],i)=>`<div class="barrow"><span>${i+1}. ${esc(menuName(r))}</span><div class="bar"><i style="width:${n/mx*100}%"></i></div><b>${n}</b></div>`).join(''):''}
+  <h4>${t('log')}</h4>${S.tx.slice(-30).reverse().map(x=>`<div class="log"><span class="muted">${hhmm(x.gameTime)}</span><b class="${x.amount>=0?'okc':'badc'}">${x.amount>=0?'+':''}${vnd(x.amount)}</b><span>${esc(x.description)}</span></div>`).join('')||'<p class="muted">—</p>'}
+  ${S.history.length?`<h4>${t('history')}</h4>`+S.history.slice(-7).reverse().map(h=>`<div class="row"><span>${t('day',{d:h.day})}</span><span>${vnd(h.revenue)}</span><b class="${h.profit>=0?'okc':'badc'}">${h.profit>=0?'+':''}${vnd(h.profit)}</b></div>`).join(''):''}`},
+ report(){const r=S.report;if(!r)return null;const x=r.exp;
+  return`<h2 class="center">${t('report_t',{d:r.day})}</h2>
+  <div class="card"><h4>${t('revenue')}</h4>${L3(t('r_recharge'),r.rev.recharge)}${L3(t('r_food'),r.rev.food)}${L3(t('r_drink'),r.rev.drink)}<div class="row total"><span>${t('total')}</span><b>${vnd(r.revenue)}</b></div><p class="muted">${t('pc_usage_note',{h:r.pcHours.toFixed(1),v:vnd(r.pcUsage)})}</p></div>
+  <div class="card"><h4>${t('expense')}</h4>${L3(t('e_buy'),x.purchases,1)}${L3(t('exp_elec'),x.elec,1)}${L3(t('exp_net'),x.internet,1)}${L3(t('exp_maint'),x.maint,1)}${x.salary?L3(t('e_salary'),x.salary,1):''}${x.hire?L3(t('e_hire'),x.hire,1):''}${x.upgrade?L3(t('e_upgrade'),x.upgrade,1):''}<div class="row total"><span>${t('total')}</span><b>${vnd(r.expense)}</b></div></div>
+  <div class="card profit ${r.profit>=0?'pos':'neg'}"><h4>${t('profit')}</h4><div class="big">${r.profit>=0?'+':''}${vnd(r.profit)}</div></div>
+  <div class="stats">${stat(t('visitors'),r.visitors)}${stat(t('served'),r.served)}${stat(t('left'),r.left)}${stat(t('sat'),r.sat+'%')}</div>
+  <button class="pri wide" data-ui="next">${t('next')}</button>`},
+ prep(){const f=forecast(),low=ITEMS.filter(i=>S.inv[i.id]<i.min),ex=S.today.expired||{},exK=Object.keys(ex);
+  return`${newDishCard()}<h3>${t('forecast')} · ${t('weekday')[S.day%7]} ${isWeekend(S.day)?`<span class="badge acc">${t('weekend')}</span>`:''}</h3>
+  <div class="stats">${stat(t('fc_customers'),f.cust.join('–'))}${stat(t('fc_noodle'),f.noodle.join('–'))}${stat(t('fc_fried'),f.fried.join('–'))}${stat(t('fc_drink'),f.drink.join('–'))}</div>
+  ${exK.length?`<p class="badc">${esc(t('expired_line',{items:exK.map(k=>itemName(k)+' ×'+ex[k]).join(', '),v:vnd(exK.reduce((a,k)=>a+ex[k]*ITEM_BY[k].cost,0))}))}</p>`:''}
+  ${S.staff?`<p class="muted">${t('staff_today',{name:t('staff_'+S.staff.type),s:vnd(STAFF[S.staff.type].salary)})}</p>`:''}
+  <p class="${low.length?'warnc':'okc'}">${low.length?esc(t('stock_warn',{items:low.map(i=>itemName(i.id)).join(', ')})):t('stock_ok')}</p>
+  <div class="btns"><button data-ui="inv">${t('go_inv')}</button><button data-ui="go" data-a="staff">👥 ${t('nav_staff')}</button><button data-ui="go" data-a="upg">🔧 ${t('nav_upg')}</button></div>
+  <button class="pri wide" data-ui="open">${t('open_btn')}</button>`},
+ staff(){return`<h3>${t('staff_t')} <span class="muted">· ${vnd(S.money)}</span></h3><p class="muted">${t('staff_note')}</p>${Object.keys(STAFF).map(ty=>{const D=STAFF[ty],on=!!(S.staff&&S.staff.type===ty);
+  return`<div class="scard ${on?'on':''}">${charSVG(STAFF_LOOK[ty],{apron:1,s:.9})}<div class="grow"><b>${t('staff_'+ty)}</b> ${on?`<span class="badge ok">${t('staff_working')}</span>`:''}<p class="muted" style="margin:4px 0">${t('staffd_'+ty)}</p><small class="muted">${t('staff_fee',{fee:vnd(D.hire),sal:vnd(D.salary)})}</small><div style="margin-top:6px">${on?`<button class="sm danger" data-ui="fire">${t('staff_fire')}</button>`:`<button class="sm pri" data-ui="hire" data-a="${ty}">${t('staff_hire')} · ${vk(D.hire)}</button>`}</div></div></div>`}).join('')}`},
+ upg(){const u=S.upg,cook=hasCook();
+  const g=grp=>UPGRADES.filter(x=>x.grp===grp).map(x=>{const own=u[x.id],lock=x.req==='cook'&&!cook&&!own;
+   return`<div class="scard ${own?'on':''}"><div class="grow"><b>${t('upg_'+x.id)}</b><p class="muted" style="margin:4px 0">${t('upgd_'+x.id)}</p>${own?`<span class="badge ok">${t('upg_owned')}</span>`:lock?`<span class="badge warn">🔒 ${t('upg_need_cook')}</span>`:`<button class="sm pri" data-ui="upg" data-a="${x.id}">${t('upg_buy')} · ${vk(x.price)}</button>`}</div></div>`}).join('');
+  return`<h3>${t('upg_t')} <span class="muted">· ${vnd(S.money)}</span></h3><h4>${t('upg_kitchen')}</h4>${g('kitchen')}<h4>${t('upg_room')}</h4>${g('room')}`},
+ set(){return`<h3>${t('nav_set')}</h3>${rowKV(t('sound'),`<button class="sm" data-ui="sound">${S.settings.sound?t('on'):t('off')}</button>`)}${rowKV(t('hints'),`<button class="sm" data-ui="hints">${S.settings.hints!==false?t('on'):t('off')}</button>`)}${rowKV(t('language'),'Tiếng Việt')}
+  <div class="btns col"><button data-ui="save">${t('save_now')}</button><button class="ok" data-ui="test">${t('run_test')}</button><button class="danger" data-ui="reset">${t('reset')}</button></div><p class="muted">${t('save_note')}</p><p class="muted center">${t('build_lbl',{v:CFG.BUILD})}</p>`},
+ tests(){const R=UI.testRes||[],p=R.filter(x=>x.pass).length;
+  return`<h3>${t('test_t')}</h3><p class="${p===R.length?'okc':'badc'}"><b>${t('test_sum',{p,n:R.length})}</b></p>${R.map(x=>`<div class="trow"><span>${x.pass?'✅':'❌'}</span><div>${esc(x.n)}${x.info?`<small class="muted">${esc(x.info)}</small>`:''}</div></div>`).join('')}<button class="wide" data-ui="close">${t('close')}</button>`},
+ welcome(){return`<div class="head">${charSVG(GUIDE_LOOK,{mood:2,s:1.3})}<h3>${t('welcome_t')}</h3></div>${t('welcome_lines').map(l=>`<p class="say">${esc(l)}</p>`).join('')}<button class="pri wide" data-ui="start">${t('start')}</button>`}};
+function openSheet(kind,id){
+ if(UI.sheet&&UI.sheet.kind==='counter'&&!(kind==='counter'&&id===UI.sheet.id))releaseServing();
+ UI.sheet={kind,id};if(kind!=='counter'&&kind!=='cust')UI.lastRc=null;
+ if(kind==='counter'){const c=custById(id);if(c&&inQueue(c)){SERVING=id;c.state='SERVING'}}
+ $('sheetBg').style.display=kind==='counter'?'none':'block';$('sheet').style.display='block';$('sheet').scrollTop=0;UI.sheetHtml='';renderSheet()}
+function releaseServing(){const c=SERVING?custById(SERVING):null;if(c&&c.state==='SERVING')c.state='QUEUE';SERVING=null}
+function renderSheet(){if(!UI.sheet)return;const f=BUILD[UI.sheet.kind],html=f?f(UI.sheet.id):null;if(html==null){closeSheet(true);return}
+ const full=(UI.sheet.kind==='report'?'':`<button class="x" data-ui="close" aria-label="${t('close')}">✕</button>`)+html;
+ if(full!==UI.sheetHtml){UI.sheetHtml=full;$('sheet').innerHTML=full}}
+function closeSheet(force){if(!UI.sheet)return;if(UI.sheet.kind==='report'&&!force&&S.phase==='REPORT')return;
+ if(UI.sheet.kind==='counter')releaseServing();UI.sheet=null;$('sheet').style.display='none';$('sheetBg').style.display='none'}
+const ACT={
+ close:()=>closeSheet(),
+ rc:a=>{const c=UI.sheet&&custById(UI.sheet.id);if(!c)return;const amt=+a,r=recharge(c,amt);if(!r.ok){fx.err(r.err);return}
+  UI.lastRc={id:c.id,before:r.before,amt,after:r.after};fx.toast(`${vnd(r.before)} + ${vnd(amt)} = ${vnd(r.after)}`,'ok');UI.sheetHtml='';renderSheet()},
+ rcx:()=>{const v=prompt(t('enter_amount'));if(v==null)return;const n=parseMoney(v);if(!n){fx.err('err_amount');return}ACT.rc(n)},
+ assign:a=>{const c=UI.sheet&&custById(UI.sheet.id);doAssign(c,pcById(+a))},
+ deliver:a=>{const c=custById(+a);closeSheet();startDelivery(c)},
+ oos:a=>{const[cid,i]=a.split('|');markOOS(+cid,+i);renderSheet()},
+ buy:a=>{const[id,q]=a.split('|'),r=buyStock(id,+q);if(!r.ok){fx.err(r.err);return}fx.sfx('cash');fx.toast(t('toast_bought',{n:q,item:itemName(id)}),'ok');saveGame();renderSheet()},
+ open:()=>{if(openShop()){closeSheet();saveGame()}},
+ next:()=>{if(nextDay()){UI.prepShown=false;UI.lastRc=null;closeSheet(true);saveGame()}},
+ inv:()=>openSheet('inv'),go:a=>openSheet(a),viewCust:a=>openSheet('cust',+a),openPc:a=>openSheet('pc',+a),start:()=>openSheet('prep'),
+ sound:()=>{S.settings.sound=!S.settings.sound;renderSheet()},
+ hints:()=>{S.settings.hints=S.settings.hints===false;UI.hlK=null;renderSheet()},
+ save:()=>{saveGame();fx.toast(t('toast_saved'),'ok')},
+ test:()=>{UI.testRes=runTests();applyUpgrades();refreshMatch();renderMeta(0,true);openSheet('tests')},
+ reset:()=>{if(confirm(t('reset_confirm'))){UI.noSave=true;try{localStorage.removeItem(CFG.KEY);localStorage.setItem('tiemnet_v3_imported','1')}catch(e){}location.reload()}},
+ hire:a=>{const r=hireStaff(a);if(!r.ok){fx.err(r.err,r.v);return}fx.sfx('cash');fx.toast(t('toast_hired',{name:t('staff_'+a)}),'ok');saveGame();renderSheet()},
+ fire:()=>{if(fireStaff().ok){fx.toast(t('toast_fired'));saveGame()}renderSheet()},
+ upg:a=>{const r=buyUpgrade(a);if(!r.ok){fx.err(r.err,r.v);return}fx.sfx('cash');fx.toast(t('toast_upg',{name:t('upg_'+a)}),'ok');renderMeta(0,true);saveGame();renderSheet()},
+ price:a=>{const[r,d]=a.split('|'),res=setPrice(r,priceOf(r)+(+d));if(!res.ok){fx.err(res.err,res.v);return}UI.sheetHtml='';renderSheet();setT($('wallmenu'),wallMenuText())},
+ priceReset:a=>{delete S.prices[a];UI.sheetHtml='';renderSheet();setT($('wallmenu'),wallMenuText())}};
+
+/* ================= 8. LOOP + BIND ================= */
+let last=0;
+function frame(now){
+ const dt=Math.min(.1,(now-last)/1000||0);last=now;applyUpgrades();
+ if(!S.paused&&(S.phase==='OPEN'||S.phase==='CLOSING')){let m=dt*CFG.MIN_PER_SEC;while(m>1e-6){const d=Math.min(1,m);stepSim(d);m-=d}}
+ if(!S.paused)movePlayer(dt);
+ refreshMatch();renderTop();renderMeta(now);renderPCs();renderKitchen();renderHL(now);renderCustomers();renderPlayer();renderStaff();renderCarry();renderKBar();
+ if(UI.sheet&&!UI.ptr&&now-UI.refreshT>1000){UI.refreshT=now;if(['counter','cust','pc','pcs','orders'].includes(UI.sheet.kind))renderSheet()}
+ if(S.phase==='REPORT'&&(!UI.sheet||UI.sheet.kind!=='report'))openSheet('report');
+ if(S.phase==='PREP'&&!UI.sheet&&!UI.prepShown){UI.prepShown=true;openSheet('prep')}
+ requestAnimationFrame(frame)}
+/* Bàn thao tác: thẻ ô / ngăn, nút "−" trả chai, tag "Tiếp theo" (khi đang dạy món mới) */
+function onKBar(e){
+ const nx=e.target.closest('[data-nx]');
+ if(nx){if(S.paused){fx.err('err_paused');return}const[k,v]=nx.dataset.nx.split(':');
+  if(k==='cust'){startDelivery(custById(+v));return}
+  const sp=stSpot(v);if(sp)walkTo(sp.x,sp.y,()=>{UI.at=v});return}
+ const b=e.target.closest('[data-kb]');if(!b)return;if(S.paused){fx.err('err_paused');return}
+ const[a,st,y]=b.dataset.kb.split(':');
+ if(a==='ret')uiK(returnBottle(y));
+ else if(a==='spot')uiK(kTap(st,+y));else if(a==='bin')uiK(kBin(st,y));else if(a==='del')uiK(kDiscard(st,+y));else if(a==='trash')uiK(kTrash());
+ else if(a==='pu')pickupAction(+st);else if(a==='park'){const i=S.pickup.indexOf(null);if(i>=0)uiK(kTap('pickup',i));else fx.err('err_pickup_full')}}
+function onCarry(e){const b=e.target.closest('[data-ci]');if(!b)return;const i=+b.dataset.ci,d=S.carry[i];if(!d)return;
+ const o=refreshMatch().byObj.get(d);if(o&&!S.paused){UI.trayConfirm=null;startDelivery(o.c);return}
+ if(UI.trayConfirm===i){discardCarry(i);UI.trayConfirm=null;fx.toast(t('toast_discard',{item:dishLabel(d)}))}
+ else{UI.trayConfirm=i;fx.toast(t('tray_tap',{item:dishLabel(d)}));setTimeout(()=>{if(UI.trayConfirm===i)UI.trayConfirm=null},2500)}}
+function bind(){
+ document.querySelectorAll('[data-t]').forEach(e=>{e.textContent=t(e.dataset.t)});
+ $('world').addEventListener('click',onWorld);
+ $('world').addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.dataset&&e.target.dataset.act){e.preventDefault();onWorld(e)}});
+ $('sheet').addEventListener('click',e=>{const b=e.target.closest('[data-ui]');if(b&&ACT[b.dataset.ui])ACT[b.dataset.ui](b.dataset.a,b)});
+ $('sheet').addEventListener('pointerdown',()=>{UI.ptr=true});
+ const up=()=>setTimeout(()=>{UI.ptr=false},350);$('sheet').addEventListener('pointerup',up);$('sheet').addEventListener('pointercancel',up);
+ $('sheetBg').addEventListener('click',()=>closeSheet());
+ $('carry').addEventListener('click',onCarry);
+ $('kbar').addEventListener('click',onKBar);
+ document.addEventListener('click',e=>{if(!S||!UI.at)return;if($('kbar').contains(e.target))return;
+  if(e.target.closest&&e.target.closest('[data-act="kst"],[data-act="spot"],[data-act="bin"]'))return;UI.at=null},true);
+ $('bPause').addEventListener('click',()=>{S.paused=!S.paused});
+ $('bStatus').addEventListener('click',()=>{if(S.phase==='PREP')ACT.open();else if(S.phase==='REPORT')openSheet('report')});
+ $('bar').addEventListener('click',e=>{const b=e.target.closest('[data-nav]');if(b&&S.phase!=='REPORT')openSheet(b.dataset.nav)});
+ document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;
+  if(e.key==='Escape'){if(UI.at)UI.at=null;else closeSheet()}
+  else if(e.key===' '&&!(e.target.dataset&&e.target.dataset.act)&&e.target.tagName!=='BUTTON'){e.preventDefault();S.paused=!S.paused}});
+ window.addEventListener('resize',fit);
+ document.addEventListener('visibilitychange',()=>{if(document.hidden)saveGame()});
+ window.addEventListener('beforeunload',saveGame);
+ setInterval(saveGame,CFG.AUTOSAVE)}
+function init(){
+ S=loadGame();const fresh=!S;if(!S)S=newState();
+ bind();buildWorld();fit();requestAnimationFrame(fit);applyUpgrades();refreshMatch();renderMeta(0,true);
+ if(UI.migrated)setTimeout(()=>fx.toast(t('migrated'),'ok'),400);
+ if(UI.saveBad)setTimeout(()=>fx.toast(t('save_bad'),'bad'),400);
+ if(UI.gift)setTimeout(()=>fx.toast(t('toast_pickup_gift'),'ok'),700);
+ if(fresh){UI.prepShown=true;openSheet('welcome')}
+ if(/[?&]test\b/.test(location.search)){UI.testRes=runTests();applyUpgrades();refreshMatch();renderMeta(0,true);openSheet('tests')}
+ requestAnimationFrame(n=>{last=n;frame(n)})}
