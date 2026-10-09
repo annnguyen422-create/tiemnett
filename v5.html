@@ -477,3 +477,170 @@ const DIALOGUE={vi:{
  broke:['Hết tiền rồi, em về đây.'],oos:['Hết món rồi hả anh...'],meh:['Tạm được anh ạ.','Cũng được.'],bad:['Dở quá anh ơi...','Mì nở hết rồi anh.','Chưa chín anh ơi!'],
  pricey:['Đắt quá, thôi khỏi.','Giá này hơi chát anh ơi.'],wrong_top:['Không đúng món em gọi anh ơi.','Em gọi khác topping mà anh...']}};
 function line(k,v){const a=(DIALOGUE[LANG]||DIALOGUE.vi)[k]||[k];let s=a[Math.floor(Math.random()*a.length)];if(v)for(const x in v)s=s.split('{'+x+'}').join(v[x]);return s}
+ /* ================= 3. STATE ================= */
+let S=null,TEST=false,NOSPAWN=false,SERVING=null;
+const UI={sheet:null,sheetHtml:'',walk:null,at:null,carryK:null,refreshT:0,hlT:0,hlK:null,hl:null,prepShown:false,lastRc:null,noSave:false,testRes:null,
+ ptr:false,trayConfirm:null,binT:0,migrated:false,saveBad:false,gift:false,sx:null,sy:null};
+const KO=step=>({ok:true,step}),KE=(err,v)=>({ok:false,err,v});
+
+/* ---------- hiệu ứng (tắt khi chạy test) ---------- */
+const SOUND_FILES={}; /* vd: SOUND_FILES.bell='sounds/bell.mp3' — có file thì phát file, không thì phát tiếng beep */
+const SFX={ctx:null,play(n){if(!S||!S.settings.sound)return;try{if(SOUND_FILES[n]){new Audio(SOUND_FILES[n]).play();return}
+ const C=this.ctx||(this.ctx=new(window.AudioContext||window.webkitAudioContext)());
+ const q={bell:[[1318,.08],[1760,.16]],cash:[[1568,.05],[2093,.1]],ding:[[1046,.12]],notify:[[784,.06],[988,.08]],pop:[[523,.05]],fry:[[180,.1]],error:[[220,.14]],step:[[660,.04]]}[n]||[];
+ let tt=C.currentTime;for(const[f,d]of q){const o=C.createOscillator(),g=C.createGain();o.type=n==='fry'?'sawtooth':'sine';o.frequency.value=f;
+  g.gain.setValueAtTime(.07,tt);g.gain.exponentialRampToValueAtTime(.0001,tt+d);o.connect(g).connect(C.destination);o.start(tt);o.stop(tt+d+.02);tt+=d}}catch(e){}}};
+const fx={
+ toast(m,k){if(TEST)return;const b=$('toasts');if(!b)return;const d=document.createElement('div');d.className='toast'+(k?' '+k:'');d.textContent=m;b.appendChild(d);
+  while(b.children.length>3)b.firstChild.remove();setTimeout(()=>d.remove(),2400)},
+ float(x,y,txt,col){if(TEST)return;const L=$('fx');if(!L)return;const d=document.createElement('div');d.className='float';d.textContent=txt;
+  d.style.left=x+'px';d.style.top=y+'px';d.style.color=col||'#303030';L.appendChild(d);setTimeout(()=>d.remove(),1250)},
+ sfx(n){if(!TEST)SFX.play(n)},
+ err(k,v){if(TEST)return;this.toast(t(k,v),'bad');this.sfx('error')}};
+function say(c,text,d){c.say={text,until:S.time+(d||18)}}
+
+/* ---------- state mới ---------- */
+function freshToday(money){return{startMoney:money,recharge:0,food:0,drink:0,pcUsage:0,pcMinutes:0,purchases:0,served:0,left:0,visitors:0,
+ orders:0,ordersFailed:0,sold:{},happySum:0,happyN:0,warned:false,hire:0,upgrade:0,staffDays:{},expired:{}}}
+function emptyKitchen(){return{board:[null,null,null],stove:[null,null],fryer:[null,null],bar:[null,null]}}
+function newState(){
+ const s={v:CFG.VERSION,verC:1,day:1,time:CFG.OPEN-30,phase:'PREP',paused:false,money:CFG.START_MONEY,rating:4,
+  pcs:PC_LAYOUT.map((p,i)=>({id:i+1,tier:p[0],x:p[1],y:p[2],status:'AVAILABLE',condition:100,performance:PC_TIERS[p[0]].perf,hourlyRate:PC_TIERS[p[0]].rate,currentCustomer:null,sessionTime:0,revenue:0})),
+  inv:Object.fromEntries(ITEMS.map(i=>[i.id,i.start])),lots:{},prices:{},upg:{},staff:null,
+  k:emptyKitchen(),hand:null,sel:{},carry:[],pickup:Array(CFG.PICKUP_N).fill(null),
+  customers:[],accounts:{},tx:[],history:[],seq:{c:0,tx:0,order:1000,dish:0},
+  player:{x:CFG.COUNTER_SPOT.x,y:CFG.COUNTER_SPOT.y,flip:false},today:null,report:null,settings:{sound:true,hints:true},tutorialDone:false};
+ s.today=freshToday(s.money);return s}
+const carryMax=()=>S&&S.upg&&S.upg.tray_big?6:CFG.CARRY_MAX;
+const hasPickup=()=>!!(S&&S.upg&&S.upg.pickup);
+const hasCook=()=>!!(S&&S.staff&&S.staff.type==='cook');
+/* Áp dụng nâng cấp vào thông số (thuần logic, không đụng giao diện) */
+function applyUpgrades(){if(!S)return;const u=S.upg||(S.upg={});
+ COOK.noodle.T=u.stove_fast?4:6;COOK.fried.T=u.fryer_fast?3.5:5;COOK.shake=u.shaker?1:2;
+ const b=u.monitor?2000:0;for(const p of S.pcs)p.hourlyRate=PC_TIERS[p.tier].rate+b}
+/* Mở món theo ngày */
+const isOpenType=tp=>!S||S.day>=(UNLOCK[tp]||1);
+const introTypes=d=>Object.keys(UNLOCK).filter(k=>UNLOCK[k]===d);
+function newDish(r,top,q){return{id:++S.seq.dish,r,top:(top||[]).slice(),q:q==null?100:q}}
+const pcById=id=>S.pcs.find(p=>p.id===id);
+const custById=id=>S.customers.find(c=>c.id===id);
+const isSeated=c=>c.state==='PLAYING'||c.state==='WAITING_FOOD'||c.state==='EATING'||c.state==='RECHARGE';
+const inQueue=c=>c.state==='TO_QUEUE'||c.state==='QUEUE'||c.state==='SERVING';
+const seatOf=pc=>({x:pc.x+50,y:pc.y+94});
+const pcLabel=c=>c&&c.pcId?t('pc_short',{n:c.pcId}):(c?c.name:'');
+
+/* ================= 3. ECONOMY ================= */
+function addTx(amount,type,desc){amount=Math.round(amount);S.money+=amount;
+ S.tx.push({transactionId:'TX'+(++S.seq.tx),type,amount,timestamp:Date.now(),day:S.day,gameTime:Math.floor(S.time),description:desc});
+ if(S.tx.length>3000)S.tx.shift()}
+function priceOf(r){const R=MENU_BY[r];if(!R)return 0;const p=S&&S.prices?S.prices[R.id]:null;return p!=null?p:R.price}
+function itemPrice(it){return priceOf(it.r)+(it.top||[]).reduce((s,x)=>s+(TOPPINGS[x]?TOPPINGS[x].price:0),0)}
+function setPrice(r,p){const R=MENU_BY[r];if(!R)return KE('err_generic');if(S.phase==='REPORT')return KE('err_report');
+ p=Math.round(p/1000)*1000;const lo=Math.max(1000,Math.round(R.price*.5/1000)*1000),hi=R.price*2;
+ if(p<lo||p>hi)return KE('err_price_range',{lo:vk(lo),hi:vk(hi)});if(p===R.price)delete S.prices[R.id];else S.prices[R.id]=p;return KO('PRICE')}
+function recipeCost(r){const R=MENU_BY[r],c=id=>ITEM_BY[id]?ITEM_BY[id].cost:0;if(!R)return 0;
+ if(R.type==='noodle')return c(R.base)+c('to');if(R.type==='fried')return c(R.base)+c('dia')+c('tuong');
+ if(R.type==='mix'){const m=MIX[R.id];return c(m.base)+c(m.flavor)+c('ly')}return c(R.base)}
+function dishLabel(it){return menuName(it.r)+((it.top&&it.top.length)?' + '+it.top.map(x=>t('top_'+x)).join(', '):'')}
+function cashFree(c){return c.money-(c.order?c.order.items.filter(i=>!i.done).reduce((a,i)=>a+itemPrice(i),0):0)}
+function recharge(c,amount){
+ amount=Math.round(Number(amount));if(!c||!(amount>0))return KE('err_amount');
+ if(c.state==='LEAVING')return KE('err_cust');if(amount>cashFree(c))return KE('err_wallet');
+ const before=c.balance;c.money-=amount;c.balance+=amount;addTx(amount,'RECHARGE',t('tx_recharge',{name:c.name}));S.today.recharge+=amount;
+ if(c.rechargeReq){c.happiness=clamp(c.happiness+(amount>=c.rechargeReq?8:3),0,100);c.rechargeReq=0}
+ if(c.state==='RECHARGE')c.state=c.order?'WAITING_FOOD':'PLAYING';if(c.askAmt)c.askAmt=Math.max(0,c.askAmt-amount);
+ fx.sfx('cash');fx.float(c.x,c.y-74,'+'+vnd(amount),'#2f8a47');return{ok:true,step:'RECHARGE',before,after:c.balance}}
+
+/* ---------- kho + lô hàng + hạn dùng ---------- */
+function syncLots(id){if(!SHELF[id])return;S.lots=S.lots||{};const L=S.lots[id]=(S.lots[id]||[]).filter(l=>l.n>0);
+ let sum=L.reduce((a,l)=>a+l.n,0);const inv=S.inv[id]||0;L.sort((a,b)=>a.exp-b.exp);
+ if(sum<inv)L.push({n:inv-sum,exp:S.day+SHELF[id]});
+ while(sum>inv&&L.length){const l=L[0],d=Math.min(l.n,sum-inv);l.n-=d;sum-=d;if(!l.n)L.shift()}
+ L.sort((a,b)=>a.exp-b.exp)}
+function takeStock(id){if((S.inv[id]||0)<=0)return null;syncLots(id);S.inv[id]--;let exp=null;
+ if(SHELF[id]){const L=S.lots[id];if(L.length){L[0].n--;exp=L[0].exp;if(!L[0].n)L.shift()}}return{exp}}
+function returnStock(id,exp){if(SHELF[id])syncLots(id);S.inv[id]=(S.inv[id]||0)+1;
+ if(SHELF[id]){S.lots[id].push({n:1,exp:exp!=null?exp:S.day+SHELF[id]});S.lots[id].sort((a,b)=>a.exp-b.exp)}}
+function expireLots(){const out={};for(const id in SHELF){syncLots(id);const L=S.lots[id];let n=0;
+ while(L.length&&L[0].exp<S.day){n+=L[0].n;L.shift()}if(n){S.inv[id]-=n;out[id]=n}}S.today.expired=out;return out}
+function buyStock(id,qty){
+ const it=ITEM_BY[id];qty=Math.floor(qty);if(!it||!(qty>0))return KE('err_generic');if(S.phase==='REPORT')return KE('err_report');
+ const cost=it.cost*qty;if(S.money<cost)return KE('err_money');
+ if(SHELF[id])syncLots(id);S.inv[id]+=qty;
+ if(SHELF[id]){S.lots[id].push({n:qty,exp:S.day+SHELF[id]});S.lots[id].sort((a,b)=>a.exp-b.exp)}
+ addTx(-cost,'INVENTORY_PURCHASE',t('tx_buy',{n:qty,unit:it.unit,item:itemName(id)}));S.today.purchases+=cost;return{ok:true,step:'BUY',cost}}
+function hasStockFor(r){const R=MENU_BY[r],h=id=>(S.inv[id]||0)>0;if(!R)return false;
+ if(R.type==='noodle')return h(R.base)&&h('to');if(R.type==='fried')return h(R.base)&&h('dia')&&h('tuong');
+ if(R.type==='mix'){const m=MIX[R.id];return h('ly')&&h(m.base)&&h(m.flavor)}return h(R.id)}
+/* Trả 1 chai về Tủ lạnh: ưu tiên chai chưa có khách nhận */
+function returnBottle(id){
+ const idx=S.carry.map((d,i)=>d.r===id?i:-1).filter(i=>i>=0);if(!idx.length)return KE('err_nothing_return');
+ const m=refreshMatch();let k=idx.find(i=>!m.byObj.get(S.carry[i]));if(k==null)k=idx[idx.length-1];
+ S.carry.splice(k,1);returnStock(id,null);refreshMatch();return KO('RETURN')}
+
+/* ---------- nhân viên + nâng cấp ---------- */
+function hireStaff(ty){const D=STAFF[ty];if(!D)return KE('err_generic');if(S.phase==='REPORT')return KE('err_report');
+ if(S.staff)return KE('err_staff_one');if(S.money<D.hire)return KE('err_money');
+ addTx(-D.hire,'STAFF_HIRE',t('tx_hire',{name:t('staff_'+ty)}));S.today.hire=(S.today.hire||0)+D.hire;
+ S.staff={type:ty,hand:null,t:0,st:null,busy:0};S.today.staffDays=S.today.staffDays||{};S.today.staffDays[ty]=true;return KO('HIRE')}
+function fireStaff(){if(!S.staff)return KE('err_generic');
+ if(S.staff.type==='cashier')for(const c of S.customers)if(c.state==='SERVING'&&c.id!==SERVING)c.state='QUEUE';
+ S.staff=null;UI.sx=UI.sy=null;return KO('FIRE')}
+function buyUpgrade(id){const U=UPG_BY[id];if(!U)return KE('err_generic');if(S.upg[id])return KE('err_upg_owned');
+ if(U.req==='cook'&&!hasCook())return KE('err_need_cook');
+ if(S.phase==='REPORT')return KE('err_report');if(S.money<U.price)return KE('err_money');
+ addTx(-U.price,'UPGRADE',t('upg_'+id));S.today.upgrade=(S.today.upgrade||0)+U.price;S.upg[id]=true;applyUpgrades();return KO('UPGRADE')}
+
+/* ================= 3. SAVE / LOAD ================= */
+function serialize(){return JSON.stringify(S)}
+function mapOld(r){const L=LEGACY[r];return L?{r:L[0],top:L[1].slice()}:{r,top:[]}}
+function migrateV1(d){ /* save Phase 1 → v2 */
+ d.v=2;const inv=d.inv||{};inv.tra=(inv.tra||0)+(inv.trachanh||0);delete inv.trachanh;
+ for(const it of ITEMS)if(inv[it.id]==null)inv[it.id]=it.start;d.inv=inv;
+ d.k=emptyKitchen();d.hand=null;d.sel={};delete d.stations;
+ d.tray=(d.tray||[]).map(r=>{const m=mapOld(r);return{r:m.r,top:m.top,q:100}}).filter(x=>MENU_BY[x.r]);
+ for(const c of d.customers||[]){
+  if(c.order){c.order.items=c.order.items.map(it=>{const m=mapOld(it.r);return{r:m.r,top:it.top||m.top,done:!!it.done}}).filter(it=>MENU_BY[it.r]);if(!c.order.items.length)c.order=null}
+  c.preferredFood=mapOld(c.preferredFood).r;c.preferredDrink=mapOld(c.preferredDrink).r}
+ const fix=o=>{if(!o)return o;const s={};for(const k in o){const r=mapOld(k).r;s[r]=(s[r]||0)+o[k]}return s};
+ if(d.today)d.today.sold=fix(d.today.sold);if(d.report)d.report.sold=fix(d.report.sold)}
+function migrateV2(d){ /* save Phase 2/3 → v3: bếp mới, khay → carry, Quầy ra món, hàng chờ mới */
+ d.v=3;d.seq=Object.assign({c:0,tx:0,order:1000,dish:0},d.seq||{});
+ d.carry=(d.tray||[]).filter(x=>x&&MENU_BY[x.r]).map(x=>({id:++d.seq.dish,r:MENU_BY[x.r].id,top:x.top||[],q:x.q==null?100:x.q}));delete d.tray;
+ d.pickup=Array(CFG.PICKUP_N).fill(null);d.k=emptyKitchen();d.hand=null;d.sel={};if(d.staff)d.staff.hand=null;
+ d.settings=d.settings||{};if(d.settings.hints==null)d.settings.hints=d.settings.coach!==false;delete d.settings.coach;delete d.tutSeen;
+ for(const c of d.customers||[]){
+  if(c.state==='ENTER')c.state='TO_QUEUE';if(c.state==='WAITING')c.state='QUEUE';c.fails=c.fails||0;c.path=c.path||[];
+  if(c.order){c.order.items=c.order.items.map(it=>({r:MENU_BY[it.r]?MENU_BY[it.r].id:it.r,top:it.top||[],done:!!it.done})).filter(it=>MENU_BY[it.r]);if(!c.order.items.length)c.order=null}
+  if(!c.order&&c.state==='WAITING_FOOD')c.state='PLAYING';
+  if(!MENU_BY[c.preferredFood])c.preferredFood='mi_tom';if(!MENU_BY[c.preferredDrink])c.preferredDrink='water'}}
+/* Save trước Patch C: có đầu bếp → tặng Quầy ra món; không có → món trên quầy chuyển về khay. Chạy 1 lần. */
+function migrateC(d){d.verC=1;d.upg=d.upg||{};let gift=false;
+ if(d.staff&&d.staff.type==='cook'&&!d.upg.pickup){d.upg.pickup=true;gift=true}
+ if(!d.upg.pickup){const max=d.upg.tray_big?6:CFG.CARRY_MAX;
+  for(const x of d.pickup)if(x&&d.carry.length<max)d.carry.push(x);d.pickup=Array(CFG.PICKUP_N).fill(null)}
+ return gift}
+function deserialize(str){
+ const d=JSON.parse(str);if(!d||typeof d!=='object')throw new Error('bad');let mig=false;
+ if(d.v===1){migrateV1(d);mig=true}
+ if(d.v===2){migrateV2(d);mig=true}
+ if(d.v!==CFG.VERSION)throw new Error('version');
+ const out=Object.assign(newState(),d);delete out.speed;
+ out.inv=Object.assign(Object.fromEntries(ITEMS.map(i=>[i.id,0])),d.inv||{});
+ out.settings=Object.assign({sound:true,hints:true},d.settings||{});
+ out.k=Object.assign(emptyKitchen(),d.k||{});out.sel=d.sel||{};out.hand=d.hand||null;
+ out.carry=Array.isArray(d.carry)?d.carry:[];
+ const pu=Array.isArray(d.pickup)?d.pickup.slice(0,CFG.PICKUP_N):[];while(pu.length<CFG.PICKUP_N)pu.push(null);out.pickup=pu;
+ out.seq=Object.assign({c:0,tx:0,order:1000,dish:0},d.seq||{});
+ out.today=Object.assign(freshToday(out.money),d.today||{});
+ out.lots=d.lots||{};out.prices=d.prices||{};out.upg=d.upg||{};
+ out.verC=d.verC;if(out.verC==null&&migrateC(out))out._gift=true;
+ if(mig)out._migrated=true;return out}
+function saveGame(){if(TEST||UI.noSave||!S)return;try{localStorage.setItem(CFG.KEY,serialize())}catch(e){}}
+function loadGame(){
+ let s=null,fromOld=false;
+ try{s=localStorage.getItem(CFG.KEY);if(!s&&!localStorage.getItem('tiemnet_v3_imported')){s=localStorage.getItem(CFG.OLD_KEY);fromOld=!!s}}catch(e){return null}
+ if(!s)return null;
+ try{const d=deserialize(s);if(d._migrated||fromOld)UI.migrated=true;if(d._gift)UI.gift=true;delete d._migrated;delete d._gift;
+  if(fromOld){try{localStorage.setItem('tiemnet_v3_imported','1')}catch(_){}}return d}
+ catch(e){try{localStorage.setItem(CFG.KEY+'_backup_'+Date.now(),s)}catch(_){}UI.saveBad=true;return null}}
