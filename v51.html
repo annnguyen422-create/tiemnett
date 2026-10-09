@@ -1383,8 +1383,7 @@ function renderKBar(){
     :(w&&((w.k==='prep'&&!w.done)||w.st==='shaking'))?`<div class="kpb" data-q="${st}:${i}"><i class="zb" style="left:0;width:0"></i></div>`:'';
    h+=`<div class="kbw"><button data-kb="spot:${st}:${i}" class="${sel?'sel':''}">${w?wiSVG(w,30):'<span class="slotnum">'+(i+1)+'</span>'}<span>${esc(a)}</span>${s?`<small>${esc(s)}</small>`:''}${bar}</button>${w&&!isCookItem(w)&&(st==='board'||st==='bar')?`<button class="mini" data-kb="del:${st}:${i}" aria-label="${t('kb_discard')}">✕</button>`:''}</div>`});
   (K.bins||[]).forEach(([id])=>{const n=id==='da'?'∞':(S.inv[id]||0),q=binQty(st,id);
-   const minus=GRAB[st]&&q?`<span class="minus" data-kb="ret:${st}:${id}" role="button" aria-label="${t('kb_return_one')}">−</span>`:'';
-   h+=`<button data-kb="bin:${st}:${id}" class="${n===0&&!q?'out':''} ${q?'sel':''} ${hlb.includes(st+':'+id)?'nvb':''}">${binSVG(st,id,26)}<span>${esc(binName(st,id))}</span><small>${n}</small>${q?`<em class="qty">x${q}</em>`:''}${minus}</button>`});
+   const minus=GRAB[st]&&q?`<span class="minus" data-kb="ret:${st}:${id}" role="button" aria-label="${t('kb_return_one')}">−</span>`:'';   h+=`<button data-kb="bin:${st}:${id}" class="${n===0&&!q?'out':''} ${q?'sel':''} ${hlb.includes(st+':'+id)?'nvb':''}">${binSVG(st,id,26)}<span>${esc(binName(st,id))}</span><small>${n}</small>${q?`<em class="qty">x${q}</em>`:''}${minus}</button>`});
   kb.innerHTML=h+'</div>'}
  /* tag "Tiếp theo": chỉ bấm được khi đang dạy món mới */
  const nx=S.settings.hints!==false?nextAction(MATCH||refreshMatch()):null;let row=kb.querySelector('.knext');
