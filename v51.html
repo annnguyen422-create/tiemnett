@@ -205,6 +205,14 @@ body.kb #carry{display:none}
 .ipbtn:disabled{opacity:.25}
 .ipnext:not(:disabled){background:var(--sec);color:#fff;box-shadow:0 3px 0 var(--dark);animation:pulse .9s infinite alternate}
 .ipdots{font-size:14px;letter-spacing:4px;color:var(--sec)}
+.evbig{font-size:56px;line-height:1}
+.evchip{display:inline-block;margin:4px 0;padding:4px 12px;border:2px solid var(--dark);border-radius:999px;background:#E6F1FB;font-weight:900;font-size:14px}
+.blackout .pcrug{background:rgba(20,20,40,.35)}
+.blackout .pc[data-s] .scr{fill:#111}
+.blackout .pc[data-s] .game{display:none}
+.rain{display:none;pointer-events:none;border-radius:8px;background:repeating-linear-gradient(105deg,transparent 0 8px,rgba(91,157,239,.55) 8px 10px);background-size:20px 20px;animation:rain .4s linear infinite}
+.raining .rain{display:block}
+@keyframes rain{to{background-position:-6px 20px}}
 </style>
 </head>
 <body>
@@ -343,6 +351,7 @@ const ambKeys=()=>Object.keys(AMB).filter(k=>k!=='hot'||!(S&&S.upg.aircon));
 const NICKS=['SátThủ2k9','Bé Na','TuấnĐẹpTrai','Hùng Bến Tre','Chú Ba','Gà Mờ','ProNoKill','Mèo Hồng','XạThủ07','Lão Đại','Bé Bơ','Tí Nị'];
 const PARENT_LOOK={skin:'#F6CBA0',hair:'#2b2420',shirt:'#8E6CD9',pants:'#303030',style:1,acc:2,accColor:'#303030'};
 const NEWCHAR={uniform:{day:4}}; /* khách mới mở theo ngày → giới thiệu 1 lần ở bảng chuẩn bị */
+const EVENTS={rain:{p:.25,icon:'🌧️'},power:{p:.15,icon:'⚡'},net:{p:.10,icon:'📶'}},EVENT_DAY=5; /* sự kiện ngẫu nhiên, tối đa 1/ngày */
  const PICKUP={x:896,y:196,w:56,h:324};
 const pickupSlotPos=i=>[6,30+i*48];
 const STAFF={cashier:{hire:400000,salary:150000,every:1},cook:{hire:700000,salary:200000,every:.5}};
@@ -350,7 +359,7 @@ const STAFF_LOOK={cook:{skin:'#F6CBA0',hair:'#3b3b3b',shirt:'#fff',pants:'#30303
 const UPGRADES=[{id:'stove_auto',grp:'kitchen',price:900000},{id:'fryer_auto',grp:'kitchen',price:1200000},{id:'stove_fast',grp:'kitchen',price:700000},
  {id:'fryer_fast',grp:'kitchen',price:800000},{id:'shaker',grp:'kitchen',price:400000},{id:'tray_big',grp:'kitchen',price:500000},
  {id:'pickup',grp:'kitchen',price:800000,req:'cook'},
- {id:'monitor',grp:'room',price:2400000},{id:'chairs',grp:'room',price:1600000},{id:'aircon',grp:'room',price:1500000}];
+ {id:'monitor',grp:'room',price:2400000},{id:'chairs',grp:'room',price:1600000},{id:'aircon',grp:'room',price:1500000},{id:'generator',grp:'room',price:2000000}];
 const SHELF={cavien:3,bovien:3,tomvien:2,xucxich:4,holo:3};
 const CTYPES=[
  {id:'hocsinh',name:'Học sinh',money:[40000,90000],recharge:[10000,20000],play:[60,150],prefer:'thuong',hunger:.5,thirst:.6,foods:['mi_tom','mi_cay','xx_chien','holo','bimbim','huongduong'],drinks:['cola','tra_chanh','soda'],pat:1,w:[1,3,2,1,.2]},
@@ -487,6 +496,10 @@ const STR={vi:{
   st_snack:'Kệ snack',nd_snack_t:'Ăn vặt',nd_snack:['Bấm Kệ snack → chọn đúng món khách gọi.','Bấm khách có vòng xanh để giao.'],
  bin_bimbim:'Bim bim',bin_huongduong:'Hướng dương',bin_banhngot:'Bánh mì ngọt',
   nc_title:'Khách mới',nc_uniform:'Học sinh trốn học ra net. Phụ huynh sẽ tới đón về — không bị trừ sao.',
+  ne_title:'Sự kiện mới',ne_rain:'Trời mưa: khách vào trú đông hơn, chờ cũng lâu hơn. Nhập thêm hàng!',
+ ne_power:'Cúp điện một lúc: máy tắt, khách ngồi chờ và bực. Mua Máy phát điện để không lo.',ne_net:'Đứt cáp quang: mạng lag cả ngày, khách kém vui và về sớm hơn.',
+ ns_rain:'Trời mưa · khách +30%',ns_power:'Hôm nay sẽ cúp điện',ns_net:'Đứt cáp quang · mạng lag',ev_power_on:'Cúp điện!',ev_power_off:'Có điện lại',
+ upg_generator:'Máy phát điện',upgd_generator:'Cúp điện thì máy phát tự chạy: khách vẫn chơi bình thường.',
  migrated:'Đã chuyển save sang phiên bản mới.',save_bad:'Save không đọc được nên đã được sao lưu riêng, bắt đầu game mới.',
  top_trung:'trứng',top_xucxich:'xúc xích',top_cavien:'cá viên',top_rau:'rau',
  bin_mi:'Mì tôm',bin_mi_bo:'Mì bò',bin_mi_ga:'Mì gà',bin_mi_cay:'Mì cay',bin_cavien:'Cá viên',bin_bovien:'Bò viên',bin_tomvien:'Tôm viên',bin_xucxich:'Xúc xích',bin_holo:'Hồ lô',
@@ -538,7 +551,7 @@ function newState(){
   inv:Object.fromEntries(ITEMS.map(i=>[i.id,i.start])),lots:{},prices:{},upg:{},staff:null,
   k:emptyKitchen(),hand:null,sel:{},carry:[],pickup:Array(CFG.PICKUP_N).fill(null),
   customers:[],accounts:{},tx:[],history:[],seq:{c:0,tx:0,order:1000,dish:0},
-  player:{x:CFG.COUNTER_SPOT.x,y:CFG.COUNTER_SPOT.y,flip:false},today:null,report:null,settings:{sound:true,hints:true},tutorialDone:false,seen:{}};
+  player:{x:CFG.COUNTER_SPOT.x,y:CFG.COUNTER_SPOT.y,flip:false},today:null,report:null,settings:{sound:true,hints:true},tutorialDone:false,seen:{},event:null,lastEvent:null};
  s.today=freshToday(s.money);return s}
 const carryMax=()=>S&&S.upg&&S.upg.tray_big?6:CFG.CARRY_MAX;
 const hasPickup=()=>!!(S&&S.upg&&S.upg.pickup);
@@ -551,6 +564,10 @@ function applyUpgrades(){if(!S)return;const u=S.upg||(S.upg={});
 const isOpenType=tp=>!S||S.day>=(UNLOCK[tp]||1);
 const introTypes=d=>Object.keys(UNLOCK).filter(k=>UNLOCK[k]===d);
 const newChars=()=>Object.keys(NEWCHAR).filter(k=>S.day>=NEWCHAR[k].day&&!(S.seen||{})[k]);
+ const evOn=k=>!!(S&&S.event&&S.event.k===k&&(k!=='power'||(S.time>=S.event.start&&S.time<S.event.start+S.event.dur)));
+const powerOut=()=>evOn('power')&&!S.upg.generator;
+function rollEvent(){S.event=null;if(S.day>=EVENT_DAY){let r=Math.random();for(const k in EVENTS){if(k===S.lastEvent)continue;if(r<EVENTS[k].p){S.event={k};break}r-=EVENTS[k].p}
+ if(S.event&&S.event.k==='power'){S.event.start=rint(600,1200);S.event.dur=rint(15,25)}}S.lastEvent=S.event?S.event.k:null}
  function newDish(r,top,q){return{id:++S.seq.dish,r,top:(top||[]).slice(),q:q==null?100:q}}
 const pcById=id=>S.pcs.find(p=>p.id===id);
 const custById=id=>S.customers.find(c=>c.id===id);
@@ -696,7 +713,7 @@ function spawnCustomer(o){
  o=o||{};const per=period(S.time);let acc=null;
  if(!o.type){const names=Object.keys(S.accounts);if(names.length&&Math.random()<.35){const n=pick(names);if(!S.customers.some(c=>c.name===n))acc=S.accounts[n]}}
  const T=o.type?CT[o.type]:acc?CT[acc.type]:wpick(CTYPES,x=>x.w[per]);
- const money=rint(T.money[0]/1000,T.money[1]/1000)*1000,balance=acc?acc.balance:0,pat=Math.round(PAT.queue*T.pat*(S.upg.aircon?1.3:1));
+ const money=rint(T.money[0]/1000,T.money[1]/1000)*1000,balance=acc?acc.balance:0,pat=Math.round(PAT.queue*T.pat*(S.upg.aircon?1.3:1)*(evOn('rain')?1.3:1));
  const c={id:++S.seq.c,name:acc?acc.name:newName(),type:T.id,look:acc?acc.look:randLook(T),money,balance,returning:!!acc,
   state:'TO_QUEUE',x:CFG.DOOR.x,y:CFG.DOOR.y,path:[],flip:false,pcId:null,patienceMax:pat,patience:pat,happiness:70,fails:0,
   gamingTime:rint(T.play[0],T.play[1]),played:0,hunger:rint(0,45),thirst:rint(0,45),
@@ -713,7 +730,7 @@ function spawnCustomer(o){
  return c}
 function maybeSpawn(dt){
  if(NOSPAWN)return;if(S.customers.length>=S.pcs.length+9)return;
- const p=PERIODS[period(S.time)].rate*(isWeekend(S.day)?1.3:1)*(0.6+S.rating*0.1)*dt;
+ const p=PERIODS[period(S.time)].rate*(isWeekend(S.day)?1.3:1)*(0.6+S.rating*0.1)*(evOn('rain')?1.3:1)*dt;
  if(Math.random()<p)spawnCustomer()}
 function moveTo(c,x,y,dt){const dx=x-c.x,dy=y-c.y,d=Math.hypot(dx,dy),st=CFG.WALK*dt;
  if(d<=st){c.x=x;c.y=y;return true}c.x+=dx/d*st;c.y+=dy/d*st;if(Math.abs(dx)>1)c.flip=dx<0;return false}
@@ -785,7 +802,7 @@ function markOOS(cid,i){
 /* ---------- mỗi phút game của khách đang ngồi máy ----------
    Hết giờ chơi / hết tiền máy mà còn món đang chờ → ngồi chờ tiếp, không tính tiền máy */
 function seatedTick(c,dt){
- const T=CT[c.type],pc=pcById(c.pcId);if(!pc){checkout(c);return}if(c.parentAt&&!c.parentId&&S.time>=c.parentAt&&S.phase==='OPEN')spawnParent(c);if(c.parentAt&&!c.parentId&&S.time>=c.parentAt&&S.phase==='OPEN')spawnParent(c);
+ const T=CT[c.type],pc=pcById(c.pcId);if(!pc){checkout(c);return}if(c.parentAt&&!c.parentId&&S.time>=c.parentAt&&S.phase==='OPEN')spawnParent(c);if(powerOut()&&c.state!=='EATING'){c.happiness=clamp(c.happiness-2*dt,0,100);if(c.happiness<15&&!c.order){S.today.left++;checkout(c)}return}if(c.parentAt&&!c.parentId&&S.time>=c.parentAt&&S.phase==='OPEN')spawnParent(c);
  const pending=!!(c.order&&c.order.items.some(i=>!i.done)),timeUp=c.played>=c.gamingTime,cost=pc.hourlyRate/60*dt,playing=!timeUp&&c.balance>=cost;
  if(!playing&&!pending){
   if(timeUp){say(c,line('bye'),30);checkout(c);return}
@@ -794,7 +811,7 @@ function seatedTick(c,dt){
    c.rechargePatience=Math.max(c.rechargePatience,c.rechargePatienceMax*.6);say(c,line(c.joke?'more':'recharge',{amt:vk(amt)}))}
   else{say(c,line('broke'),30);checkout(c)}return}
  if(playing){c.balance-=cost;pc.revenue+=cost;pc.sessionTime+=dt;S.today.pcUsage+=cost;S.today.pcMinutes+=dt;c.played+=dt;c.hunger+=T.hunger*.7*dt;c.thirst+=T.thirst*.7*dt}
-  c.waitOnly=!playing;if(playing&&c.state==='PLAYING'&&!c.order&&!c.say&&(!c.emo||S.time>c.emo.until+20)&&Math.random()<.02*dt){const k=pick(ambKeys());c.emo={k,until:S.time+4,txt:line('amb_'+k)}}
+ c.waitOnly=!playing;if(playing&&evOn('net'))c.happiness=clamp(c.happiness-.3*dt,0,100);if(playing&&c.state==='PLAYING'&&!c.order&&!c.say&&(!c.emo||S.time>c.emo.until+20)&&Math.random()<(evOn('net')?.06:.02)*dt){const k=evOn('net')&&Math.random()<.7?'lag':pick(ambKeys());c.emo={k,until:S.time+4,txt:line('amb_'+k)}}
  if(c.state==='EATING'){c.eatT-=dt;if(c.eatT<=0)c.state=c.order?'WAITING_FOOD':'PLAYING'}
  else if(c.state==='WAITING_FOOD'){
   const ready=orderReady(c),m0=moodKey(c.orderPatience/c.orderPatienceMax);
@@ -825,7 +842,7 @@ function updCustomer(c,dt){
    if(c.state!=='SERVING'){c.patience-=dt*PAT.drainQueue;
     if(c.patience<=0){c.happiness=clamp(c.happiness-40,0,100);say(c,line('angry_wait'),30);S.today.left++;leave(c)}}
    break}
-  case'TO_PC':if(moveAlong(c,dt)){const pc=pcById(c.pcId);if(pc)pc.status='OCCUPIED';c.state='PLAYING';c.lastOrderT=S.time;c.flip=false;if(c.uniform)c.parentAt=S.time+rint(30,90);if(c.uniform)c.parentAt=S.time+rint(30,90);fx.sfx('pop')}break;
+  case'TO_PC':if(moveAlong(c,dt)){const pc=pcById(c.pcId);if(pc)pc.status='OCCUPIED';c.state='PLAYING';c.lastOrderT=S.time;c.flip=false;if(c.uniform)c.parentAt=S.time+rint(30,90);if(evOn('net'))c.gamingTime=Math.round(c.gamingTime*.8);if(c.uniform)c.parentAt=S.time+rint(30,90);fx.sfx('pop')}break;
   case'PLAYING':case'WAITING_FOOD':case'EATING':seatedTick(c,dt);break;
   case'RECHARGE':c.rechargePatience-=dt;if(c.rechargePatience<=0){c.happiness=clamp(c.happiness-20,0,100);say(c,line('broke'),30);checkout(c)}break;
    case'PARENT_IN':if(moveAlong(c,dt))parentArrive(c);break;
@@ -833,14 +850,18 @@ function updCustomer(c,dt){
  if(c.say&&S.time>c.say.until)c.say=null}
 
 /* ================= 4. DAY LOOP ================= */
-function openShop(){if(S.phase!=='PREP')return false;S.seen=S.seen||{};for(const k of newChars())S.seen[k]=1;S.phase='OPEN';S.time=CFG.OPEN;fx.sfx('bell');fx.toast(t('toast_open'),'ok');
+function openShop(){if(S.phase!=='PREP')return false;S.seen=S.seen||{};for(const k of newChars())S.seen[k]=1;if(S.event)S.seen['ev_'+S.event.k]=1;S.phase='OPEN';S.time=CFG.OPEN;fx.sfx('bell');fx.toast(t('toast_open'),'ok');
  if(!TEST&&!NOSPAWN)spawnCustomer();return true}
 function stepSim(dt){
+/* Thông báo ngắn khi cúp điện / có điện lại */
+function eventTick(){const e=S.event;if(!e||e.k!=='power')return;const on=evOn('power');
+ if(on&&!e.told){e.told=1;if(S.upg.generator)fx.toast('⚡ → 🔋','ok');else{fx.toast('⚡ '+t('ev_power_on'),'bad');fx.sfx('error')}}
+ else if(!on&&e.told===1){e.told=2;if(!S.upg.generator)fx.toast('💡 '+t('ev_power_off'),'ok')}}
  if(S.phase!=='OPEN'&&S.phase!=='CLOSING')return;
  if(S.phase==='OPEN'){S.time=Math.min(CFG.CLOSE,S.time+dt);if(S.time<CFG.LAST_ENTRY)maybeSpawn(dt);
   if(!S.today.warned&&S.time>=1350){S.today.warned=true;fx.toast(t('toast_last'))}}
  stationTick(dt);
- for(const c of S.customers)updCustomer(c,dt);
+ eventTick();for(const c of S.customers)updCustomer(c,dt);
  S.customers=S.customers.filter(c=>!c.gone);
  if(S.phase==='OPEN'&&S.time>=CFG.CLOSE){S.phase='CLOSING';for(const c of S.customers)sendHome(c);fx.toast(t('toast_closing'))}
  if(S.phase==='CLOSING'&&!S.customers.length){endDay();if(!TEST)saveGame()}}
@@ -853,7 +874,7 @@ function endDay(){
  const exp={purchases:d.purchases,elec,internet:CFG.INTERNET,maint:CFG.MAINT,salary,hire:d.hire||0,upgrade:d.upgrade||0};
  const expense=exp.purchases+exp.elec+exp.internet+exp.maint+exp.salary+exp.hire+exp.upgrade;
  S.report={day:S.day,rev,revenue,exp,expense,profit:revenue-expense,pcUsage:Math.round(d.pcUsage),pcHours:d.pcMinutes/60,visitors:d.visitors,
-  served:d.served,left:d.left,orders:d.orders,failed:d.ordersFailed,sat:d.happyN?Math.round(d.happySum/d.happyN):0,sold:{...d.sold}};
+  served:d.served,left:d.left,orders:d.orders,failed:d.ordersFailed,sat:d.happyN?Math.round(d.happySum/d.happyN):0,sold:{...d.sold},event:S.event?S.event.k:null};
  S.history.push({day:S.day,revenue,expense,profit:revenue-expense});if(S.history.length>60)S.history.shift();
  S.phase='REPORT';S.k=emptyKitchen();S.hand=null;S.sel={};S.carry=[];S.pickup=Array(CFG.PICKUP_N).fill(null);if(S.staff){S.staff.hand=null;S.staff.serving=null}
  return S.report}
@@ -861,9 +882,9 @@ function nextDay(){
  if(S.phase!=='REPORT')return false;if(S.day===1)S.tutorialDone=true;
  S.day++;S.time=CFG.OPEN-30;S.phase='PREP';S.today=freshToday(S.money);S.tx=[];S.report=null;S.customers=[];
  S.pcs.forEach(p=>{p.status='AVAILABLE';p.currentCustomer=null;p.sessionTime=0});
- S.today.staffDays=S.staff?{[S.staff.type]:true}:{};expireLots();return true}
+ S.today.staffDays=S.staff?{[S.staff.type]:true}:{};expireLots();rollEvent();return true}
 function forecast(){
- const m=(0.6+S.rating*0.1)*(isWeekend(S.day)?1.3:1);const base=PERIODS.reduce((a,p,i)=>a+p.rate*(i===4?60:p.min),0)*m;
+ const m=(0.6+S.rating*0.1)*(isWeekend(S.day)?1.3:1)*(evOn('rain')?1.3:1);const base=PERIODS.reduce((a,p,i)=>a+p.rate*(i===4?60:p.min),0)*m;
  const lo=Math.round(base*.85),hi=Math.round(base*1.15),r=(a,b)=>[Math.round(lo*a),Math.round(hi*b)];
  return{cust:[lo,hi],noodle:r(.35,.5),fried:r(.15,.3),drink:r(.5,.75)}}
  /* ================= 5. KITCHEN ================= */
@@ -1122,7 +1143,7 @@ const benchSVG=()=>`<svg viewBox="0 0 110 36" width="110" height="36" aria-hidde
 const plantSVG=()=>`<svg viewBox="0 0 40 52" width="40" height="52" aria-hidden="true"><circle cx="13" cy="18" r="9" fill="#58B368" ${OL}/><circle cx="27" cy="16" r="9" fill="#5CC8A1" ${OL}/><circle cx="20" cy="8" r="8" fill="#58B368" ${OL}/><path d="M9 30 H31 L28 50 H12 Z" fill="#FF7A59" ${OL}/></svg>`;
 const boardSVG=()=>`<svg viewBox="0 0 70 26" width="70" height="26" aria-hidden="true"><rect x="1" y="1" width="68" height="24" rx="3" fill="#2f4a3a" stroke="#8a6440" stroke-width="2"/><path d="M8 8 h22 M8 13 h16 M8 18 h20" stroke="#f4f4f4" stroke-width="1.5" stroke-linecap="round" opacity=".8"/><path d="M40 12 h20 a10 8 0 0 1 -20 0z" fill="#fff" opacity=".85"/><path d="M45 9 q2-3 0-6 M51 9 q2-3 0-6" stroke="#fff" stroke-width="1" fill="none"/></svg>`;
 const fanSVG=()=>`<svg viewBox="0 0 50 50" width="50" height="50" aria-hidden="true"><g opacity=".7"><ellipse cx="25" cy="10" rx="5" ry="10" fill="#8a6440"/><ellipse cx="25" cy="40" rx="5" ry="10" fill="#8a6440"/><ellipse cx="10" cy="25" rx="10" ry="5" fill="#8a6440"/><ellipse cx="40" cy="25" rx="10" ry="5" fill="#8a6440"/><circle cx="25" cy="25" r="5" fill="#303030"/></g></svg>`;
-const decorHTML=()=>`<div class="ent fan" style="left:440px;top:318px;z-index:900">${fanSVG()}</div><div class="ent fan" style="left:700px;top:318px;z-index:900">${fanSVG()}</div>`;
+ const decorHTML=()=>`<div class="ent fan" style="left:440px;top:318px;z-index:900">${fanSVG()}</div><div class="ent fan" style="left:700px;top:318px;z-index:900">${fanSVG()}</div><div class="ent rain" style="left:20px;top:540px;width:100px;height:60px;z-index:4"></div>`;
  const signSVG=()=>`<svg viewBox="0 0 200 24" width="200" height="24" aria-hidden="true"><rect x="2" y="2" width="196" height="20" rx="4" fill="#1d1d2b" stroke="#E85D5D" stroke-width="2"/><g class="led">${[...Array(12)].map((_,i)=>`<circle cx="${10+i*16}" cy="5" r="1.4" fill="#FFB84D"/>`).join('')}</g>${txt(100,18,'INTERNET · GAME',12,'#5CE1E6')}</svg>`;/* ---------- món ăn ở từng giai đoạn ---------- */
 const NOODLE_COL={mi:'#F2B84B',mi_bo:'#C0603A',mi_ga:'#E9C46A',mi_cay:'#E85D5D'},BROTH={mi:'#F0B860',mi_bo:'#C9773F',mi_ga:'#EFCB6A',mi_cay:'#E2553B'};
 const FRY_COL={cavien:'#F4E3C1',bovien:'#C9A58A',tomvien:'#F6C9B8',xucxich:'#E9A08C',holo:'#EBD3A8'},COOK_COL={under:'#EBC27A',perfect:'#DB9A4E',over:'#9E5B2A',ruined:'#3a2a20'};
@@ -1256,7 +1277,7 @@ function teachActive(){if(!S||S.phase!=='OPEN')return false;const intro=introTyp
 /* Lớp giao diện theo trạng thái: Quầy ra món, khóa trạm, chế độ dạy, AUTO, ngăn hết hàng */
 function renderMeta(now,force){if(!force&&now-UI.binT<300)return;UI.binT=now;
  const u=S.upg||{},body=document.body;
- body.classList.toggle('nopu',!hasPickup());body.classList.toggle('teach',teachActive());
+ body.classList.toggle('nopu',!hasPickup());body.classList.toggle('blackout',powerOut());body.classList.toggle('raining',evOn('rain'));body.classList.toggle('teach',teachActive());
  for(const st in ST_LOCK){const e=stEl(st);if(e)e.classList.toggle('lockst',!isOpenType(ST_LOCK[st]))}
  for(const st in AUTO_ST){const e=$('auto-'+st);if(e)e.style.display=u[AUTO_ST[st]]?'block':'none'}
  document.querySelectorAll('.kbn').forEach(el=>{const[,id]=el.dataset.id.split(':');el.classList.toggle('out',!(id==='da'||(S.inv[id]||0)>0))})}
@@ -1297,7 +1318,7 @@ function bubbleOf(c){if(c.type==='phuhuynh')return{k:'ph',cls:'emo',html:'😠'}
    return`<span class="oi ${cls}">${wiSVG({k:'dish',r:it.r,top:it.top},22)}</span>`}).join('');
   return{k,cls:'order',html}}
  if(c.state==='RECHARGE'||c.rechargeReq)return{k:'r'+c.rechargeReq+mk,cls:'money',html:mi+'💰 '+esc(c.joke?t('b_more'):t('b_recharge',{amt:vk(c.rechargeReq||10000)}))};
-  if(c.emo&&c.state==='PLAYING'&&S.time<c.emo.until)return{k:'e'+c.emo.k,cls:'emo',html:AMB[c.emo.k]};
+  if(powerOut()&&isSeated(c)&&!c.order)return{k:'pw',cls:'emo',html:'😠'};if(c.emo&&c.state==='PLAYING'&&S.time<c.emo.until)return{k:'e'+c.emo.k,cls:'emo',html:AMB[c.emo.k]};
  if(c.say)return{k:'s'+c.say.text,html:esc(c.say.text)};
  if(c.state==='EATING')return{k:'eat',html:'😋'};return null}
 function renderCustomers(){const lay=$('lay'),alive=new Set(),q=queueList(),custs=(UI.hl&&UI.hl.custs)||new Set();
@@ -1489,12 +1510,14 @@ const NC_ART={uniform:()=>charSVG({skin:'#FFE0C2',hair:'#2b2420',shirt:'#f4f4f4'
 function introPages(){const it=introTypes(S.day),pg=[];
  if(it.length)pg.push({title:t('nd_title'),body:it.map(tp=>`<div><b>${t('nd_'+tp+'_t')}</b><div class="ndic">${MENU.filter(m=>m.type===tp).map(m=>wiSVG({k:'dish',r:m.id,top:[]},28)).join('')}</div><ol>${t('nd_'+tp).map(s=>`<li>${esc(s)}</li>`).join('')}</ol>${tp==='mix'?`<p class="muted">${t('nd_mix_recipes')}</p>`:''}</div>`).join('')});
  for(const k of newChars())pg.push({title:t('nc_title'),body:`<div class="ncrow">${NC_ART[k]()}</div><p class="ncline">${esc(t('nc_'+k))}</p>`});
+  const ev=S.event;if(ev&&!(S.seen||{})['ev_'+ev.k])pg.push({title:t('ne_title'),body:`<div class="ncrow"><span class="evbig">${EVENTS[ev.k].icon}</span></div><p class="ncline">${esc(t('ne_'+ev.k))}</p>`});
  return pg}
 function newDishCard(){const pg=introPages(),nx=introTypes(S.day+1);let h='';
  if(pg.length){const i=UI.ip=clamp(UI.ip||0,0,pg.length-1),p=pg[i],many=pg.length>1;
   h+=`<div class="card ndcard"><h4>🆕 ${p.title}${many?` <span class="muted">${i+1}/${pg.length}</span>`:''}</h4>${p.body}`;
   if(many)h+=`<div class="ipnav"><button class="ipbtn" data-ui="ip" data-a="-1" ${i?'':'disabled'} aria-label="Trang trước">←</button><span class="ipdots">${pg.map((_,j)=>j===i?'●':'○').join('')}</span><button class="ipbtn ipnext" data-ui="ip" data-a="1" ${i<pg.length-1?'':'disabled'} aria-label="Trang sau">→</button></div>`;
   h+='</div>'}
+if(S.event)h+=`<p class="evchip">${EVENTS[S.event.k].icon} ${esc(t('ns_'+S.event.k))}${S.event.k==='power'&&S.upg.generator?' · 🔋':''}</p>`;
  if(nx.length)h+=`<p class="muted">${t('nd_next',{x:nx.map(tp=>t('nd_'+tp+'_t')).join(', ')})}</p>`;return h}
 const BUILD={
  counter(id){const c=custById(id);if(!c||!inQueue(c))return null;
@@ -1534,7 +1557,7 @@ const BUILD={
   <h4>${t('log')}</h4>${S.tx.slice(-30).reverse().map(x=>`<div class="log"><span class="muted">${hhmm(x.gameTime)}</span><b class="${x.amount>=0?'okc':'badc'}">${x.amount>=0?'+':''}${vnd(x.amount)}</b><span>${esc(x.description)}</span></div>`).join('')||'<p class="muted">—</p>'}
   ${S.history.length?`<h4>${t('history')}</h4>`+S.history.slice(-7).reverse().map(h=>`<div class="row"><span>${t('day',{d:h.day})}</span><span>${vnd(h.revenue)}</span><b class="${h.profit>=0?'okc':'badc'}">${h.profit>=0?'+':''}${vnd(h.profit)}</b></div>`).join(''):''}`},
  report(){const r=S.report;if(!r)return null;const x=r.exp;
-  return`<h2 class="center">${t('report_t',{d:r.day})}</h2>
+  return`<h2 class="center">${t('report_t',{d:r.day})}${r.event?' '+EVENTS[r.event].icon:''}</h2>
   <div class="card"><h4>${t('revenue')}</h4>${L3(t('r_recharge'),r.rev.recharge)}${L3(t('r_food'),r.rev.food)}${L3(t('r_drink'),r.rev.drink)}<div class="row total"><span>${t('total')}</span><b>${vnd(r.revenue)}</b></div><p class="muted">${t('pc_usage_note',{h:r.pcHours.toFixed(1),v:vnd(r.pcUsage)})}</p></div>
   <div class="card"><h4>${t('expense')}</h4>${L3(t('e_buy'),x.purchases,1)}${L3(t('exp_elec'),x.elec,1)}${L3(t('exp_net'),x.internet,1)}${L3(t('exp_maint'),x.maint,1)}${x.salary?L3(t('e_salary'),x.salary,1):''}${x.hire?L3(t('e_hire'),x.hire,1):''}${x.upgrade?L3(t('e_upgrade'),x.upgrade,1):''}<div class="row total"><span>${t('total')}</span><b>${vnd(r.expense)}</b></div></div>
   <div class="card profit ${r.profit>=0?'pos':'neg'}"><h4>${t('profit')}</h4><div class="big">${r.profit>=0?'+':''}${vnd(r.profit)}</div></div>
@@ -2044,6 +2067,29 @@ function runTests(){
   ok('IP2. Món mới + khách mới cùng ngày → 2 trang, nút → nổi bật',ip1.includes('●○')&&!/class="ipbtn ipnext"[^>]*disabled/.test(ip1)&&ip1.includes(t('nd_fried_t')));
   UI.ip=1;const ip2=BUILD.prep();NEWCHAR.uniform.day=ncd;UI.ip=0;
   ok('IP3. Bấm → sang trang Khách mới; trang cuối thì tắt nút →',ip2.includes('ncrow')&&ip2.includes('○●')&&/class="ipbtn ipnext"[^>]*disabled/.test(ip2));
+   /* ---- EV. Sự kiện ngẫu nhiên (v5.1d) ---- */
+  const roll=(day,n)=>{const ct={};S=newState();S.day=day;for(let i=0;i<n;i++){S.lastEvent=null;rollEvent();const k=S.event?S.event.k:'none';ct[k]=(ct[k]||0)+1}return ct};
+  const r4=roll(4,200),r5=roll(5,2000);
+  ok('EV1. Trước ngày 5 không có sự kiện',r4.none===200);
+  ok('EV2. Từ ngày 5: mưa ~25%, cúp điện ~15%, đứt cáp ~10%',Math.abs(r5.rain/2000-.25)<.05&&Math.abs(r5.power/2000-.15)<.04&&Math.abs(r5.net/2000-.10)<.04,JSON.stringify(r5));
+  S=newState();S.day=5;let rep=false;for(let i=0;i<200;i++){const pv=S.event&&S.event.k;rollEvent();if(pv&&S.event&&S.event.k===pv)rep=true}
+  ok('EV3. Không lặp lại cùng sự kiện 2 ngày liền',!rep);
+  fresh(5);S.event={k:'rain'};const fr=forecast().cust[0],rq=spawnCustomer({type:'sinhvien'});S.event=null;const f0=forecast().cust[0],nq=spawnCustomer({type:'sinhvien'});
+  ok('EV4. Trời mưa: dự báo đông hơn, khách xếp hàng kiên nhẫn hơn',fr>f0&&rq.patienceMax>nq.patienceMax);
+  fresh(5);const pw=seat();pw.happiness=70;S.event={k:'power',start:S.time,dur:20};const pb=pw.balance,pp=pw.played;stepSim(5);
+  ok('EV5. Cúp điện: máy tắt, khách không bị trừ tiền, không tính giờ chơi',pw.balance===pb&&pw.played===pp&&powerOut());
+  ok('EV6. Cúp điện: khách bực dần',pw.happiness<70);
+  renderMeta(0,true);ok('EV7. Cúp điện: khu máy tối mờ',document.body.classList.contains('blackout'));
+  until(()=>!powerOut(),30);const pb2=pw.balance;stepSim(2);
+  ok('EV8. Có điện lại → chơi tiếp, tính tiền bình thường',isSeated(pw)&&pw.balance<pb2);
+  S.upg.generator=true;S.event={k:'power',start:S.time,dur:20};const gb=pw.balance;stepSim(3);
+  ok('EV9. Có Máy phát điện → cúp điện không ảnh hưởng',!powerOut()&&pw.balance<gb);
+  fresh(5);S.event={k:'net'};const nt=seat(),nh=nt.happiness;stepSim(10);
+  ok('EV10. Đứt cáp: khách đang chơi kém vui dần',nt.happiness<nh);
+  S=newState();S.day=5;S.seen={uniform:1};S.event={k:'power',start:700,dur:20};UI.ip=0;const ep=BUILD.prep();
+  ok('EV11. Lần đầu gặp sự kiện → trang "Sự kiện mới" + chip ở dự báo',ep.includes('evbig')&&ep.includes('evchip'));
+  openShop();S.phase='PREP';const ep2=BUILD.prep();
+  ok('EV12. Lần sau chỉ còn chip biểu tượng, không giới thiệu lại',!ep2.includes('evbig')&&ep2.includes('evchip'));
   /* ---- BOT. Bot chơi trọn ngày ---- */
   const bt=simulateDay({});
   ok('BOT1. Bot tự nấu + giao trọn 1 ngày → kết thúc ngày',bt.done,bt.info);
