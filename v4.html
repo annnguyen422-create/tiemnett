@@ -1572,7 +1572,7 @@ function botTick(deliverOnly){
  dl();if(!deliverOnly){for(let g=0;g<12;g++)if(!botAct())break;dl()}
  for(const it of ITEMS)if(S.inv[it.id]<it.min)buyStock(it.id,it.pack*2)}
 function simulateDay(o){
- S=newState();S.money=S.today.startMoney=20000000;applyUpgrades();if(o.cook)hireStaff('cook');NOSPAWN=false;openShop();const errs=[];let g=0;
+ S=newState();S.money=S.today.startMoney=20000000;applyUpgrades();S.day=3;if(o.cook)hireStaff('cook');NOSPAWN=false;openShop();const errs=[];let g=0;
  while(S.phase!=='REPORT'&&g++<4000){botTick(!!o.deliverOnly);stepSim(1);checkInv(errs)}
  NOSPAWN=true;const sum=S.tx.reduce((a,x)=>a+x.amount,0),r=S.report||{},dishes=r.sold?Object.values(r.sold).reduce((a,b)=>a+b,0):0;
  return{done:S.phase==='REPORT',errs,ledger:S.money===S.today.startMoney+sum,reportOk:!!S.report&&r.profit===r.revenue-r.expense,
@@ -2008,6 +2008,91 @@ function runTestsC(){
  }catch(err){ok('Lỗi test C: '+err.message,false)}
  S=saved;SERVING=sv;TEST=false;NOSPAWN=false;applyUpgrades();return R}
 try{EXTRA_TESTS.push(runTestsC)}catch(e){setTimeout(()=>EXTRA_TESTS.push(runTestsC),0)}
+ /* ================= PATCH D — MỞ MÓN THEO NGÀY + HƯỚNG DẪN MÓN MỚI ================= */
+Object.assign(STR.vi,{
+ nd_title:'Món mới hôm nay',nd_next:'Ngày mai mở thêm: {x}',lock_day:'🔒 Ngày {d}',
+ nd_bottle_t:'Nước chai',nd_mix_t:'Pha chế',nd_fried_t:'Đồ chiên',nd_noodle_t:'Mì',
+ nd_bottle:['Bấm Tủ lạnh → chọn đúng chai khách gọi.','Bấm khách có vòng xanh để giao.'],
+ nd_mix:['Bấm Quầy pha nước → hũ Ly để đặt ly.','Bấm Đá.','Bấm Trà hoặc Cà phê.','Bấm Chanh / Đào / Sữa → ly tự lắc.','Lắc xong bấm ly → bấm khách để giao.'],
+ nd_mix_recipes:'Trà chanh = Trà + Chanh · Trà đào = Trà + Đào · Cà phê sữa đá = Cà phê + Sữa',
+ nd_fried:['Bấm Tủ đông → chọn đúng loại.','Bấm Chảo chiên để thả vào.','Vớt khi vạch đen vào vùng XANH (để lâu sẽ cháy).','Bấm Bàn sơ chế → tự bày đĩa, rưới tương.','Xong bấm đĩa → bấm khách để giao.'],
+ nd_noodle:['Bấm Thùng mì → chọn đúng loại.','Bấm Bàn sơ chế → tự xé gói, cho vào tô, nêm.','Thêm topping khách gọi — phải ĐÚNG Y (nhìn nhãn “+trứng”…).','Bấm tô → mang lên Bếp.','Vớt khi vạch vào vùng XANH → bấm khách để giao.']});
+(function(){const st=document.createElement('style');st.textContent=`
+[data-act="kst"].lockst{filter:grayscale(1) opacity(.5);pointer-events:none}
+.lockb{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);background:#303030;color:#fff;font-size:11px;font-weight:900;border-radius:999px;padding:1px 8px;white-space:nowrap;z-index:6}
+.ndcard{background:#FFF0D6;border-color:var(--pri)}
+.ndcard ol{margin:4px 0 6px 20px;padding:0;font-size:14px;line-height:1.5}
+.ndic{display:flex;gap:4px;margin:4px 0;flex-wrap:wrap}
+.teach .nv{outline:5px solid #E85D5D;animation-duration:.4s}
+.teach .kbn.nvb{transform:scale(1.2)}`;document.head.appendChild(st)})();
+const UNLOCK={bottle:1,mix:1,fried:2,noodle:3};
+const ST_LOCK={board:'fried',freezer:'fried',fryer:'fried',noodlebox:'noodle',stove:'noodle'};
+const isOpenType=tp=>!S||S.day>=(UNLOCK[tp]||1);
+const introTypes=d=>Object.keys(UNLOCK).filter(k=>UNLOCK[k]===d);
+const maxItemsOn=d=>d<=3?1:d<=5?2:3;
+/* Gọi món: chỉ món đã mở, ưu tiên món mới trong ngày, giới hạn số món theo ngày */
+maybeOrder=function(c,force){
+ const T=CT[c.type],open=r=>!!(MENU_BY[r]&&isOpenType(MENU_BY[r].type)),intro=introTypes(S.day);
+ let items=[],budget=c.money,skipped=false;
+ const add=(r,top)=>{if(!open(r))return false;const ratio=priceOf(r)/MENU_BY[r].price;
+  if(!force&&ratio>1&&Math.random()<Math.min(.9,(ratio-1)*1.2)){skipped=true;return false}
+  const it={r,top:top||[],done:false},p=itemPrice(it);if(p<=budget){items.push(it);budget-=p;return true}return false};
+ const choose=(pref,list)=>{const nw=list.filter(r=>intro.includes(MENU_BY[r].type));if(nw.length&&Math.random()<.6)return pick(nw);return open(pref)&&Math.random()<.6?pref:pick(list)};
+ const foods=T.foods.filter(open),drinks=T.drinks.filter(open);
+ if((c.hunger>=60||force)&&foods.length){const f=choose(c.preferredFood,foods),top=[];
+  if(MENU_BY[f].type==='noodle'){if(Math.random()<.55)top.push(pick(TOP_IDS));if(Math.random()<.15){const x=pick(TOP_IDS);if(!top.includes(x))top.push(x)}}
+  if(!add(f,top))add(f,[]);const fr=['cavien','bovien','tomvien','xx_chien','holo'].filter(open);if(fr.length&&Math.random()<.2)add(pick(fr),[])}
+ if(drinks.length&&(c.thirst>=60||(c.hunger>=60&&!foods.length)||(force&&!items.length)||(items.length&&Math.random()<.5)))add(choose(c.preferredDrink,drinks),[]);
+ c.lastOrderT=S.time;
+ const mx=maxItemsOn(S.day);if(items.length>mx)items=items.slice(0,mx);
+ if(!force){const left=c.gamingTime-c.played,bud=it=>PAT.budget[MENU_BY[it.r].type]||30,need=()=>items.reduce((s,it)=>s+bud(it),0)+15;
+  while(items.length&&need()>left){let k=0;items.forEach((it,i)=>{if(bud(it)>bud(items[k]))k=i});items.splice(k,1)}}
+ if(!items.length){if(skipped)say(c,line('pricey'),10);return false}
+ c.order={id:++S.seq.order,items,t:S.time};c.state='WAITING_FOOD';
+ c.orderPatienceMax=orderPatienceFor(items,T);c.orderPatience=c.orderPatienceMax;
+ S.today.orders++;say(c,line('order'),8);fx.sfx('notify');return true};
+/* Trạm chưa mở: xám + khóa */
+function updateLocks(){if(!S)return;for(const st in ST_LOCK){const e=document.querySelector(`[data-act="kst"][data-id="${st}"]`);if(!e)continue;const lock=!isOpenType(ST_LOCK[st]);
+ if(e._lk===lock&&(!lock||e._ld===S.day))continue;e._lk=lock;e._ld=S.day;e.classList.toggle('lockst',lock);let b=e.querySelector('.lockb');
+ if(lock){if(!b){b=document.createElement('div');b.className='lockb';e.appendChild(b)}b.textContent=t('lock_day',{d:UNLOCK[ST_LOCK[st]]})}else if(b)b.remove()}}
+/* Đơn đầu tiên của món mới: bật gợi ý nổi bật */
+function teachActive(){if(!S||S.phase!=='OPEN')return false;const intro=introTypes(S.day);if(!intro.length)return false;
+ const sold=Object.keys(S.today.sold||{});
+ return intro.some(tp=>!sold.some(r=>MENU_BY[r]&&MENU_BY[r].type===tp)&&S.customers.some(c=>c.order&&c.order.items.some(it=>!it.done&&MENU_BY[it.r]&&MENU_BY[it.r].type===tp)))}
+setInterval(()=>{if(!S||TEST)return;updateLocks();document.body.classList.toggle('teach',teachActive())},300);
+/* Bảng chuẩn bị đầu ngày: thêm khung “Món mới hôm nay” */
+function newDishCard(){const it=introTypes(S.day),nx=introTypes(S.day+1);if(!it.length&&!nx.length)return'';
+ let h='';if(it.length)h+=`<div class="card ndcard"><h4>🆕 ${t('nd_title')}</h4>${it.map(tp=>`<div><b>${t('nd_'+tp+'_t')}</b><div class="ndic">${MENU.filter(m=>m.type===tp).map(m=>wiSVG({k:'dish',r:m.id,top:[]},28)).join('')}</div><ol>${t('nd_'+tp).map(s=>`<li>${esc(s)}</li>`).join('')}</ol>${tp==='mix'?`<p class="muted">${t('nd_mix_recipes')}</p>`:''}</div>`).join('')}</div>`;
+ if(nx.length)h+=`<p class="muted">${t('nd_next',{x:nx.map(tp=>t('nd_'+tp+'_t')).join(', ')})}</p>`;return h}
+const _prepD=BUILD.prep;BUILD.prep=function(){return newDishCard()+_prepD()};
+function runTestsD(){
+ const R=[],ok=(n,c,i)=>R.push({n,pass:!!c,info:i||''}),saved=S,sv=SERVING;TEST=true;NOSPAWN=true;SERVING=null;
+ const orders=(day,n)=>{S=newState();S.day=day;applyUpgrades();openShop();S.time=18*60;const out=[];
+  for(let i=0;i<n;i++){const c=spawnCustomer({type:pick(['hocsinh','sinhvien','gamethu','khachdem','vanphong'])});c.state='PLAYING';c.money=500000;c.gamingTime=9999;c.hunger=100;c.thirst=100;
+   if(maybeOrder(c,false))out.push(c.order.items.map(it=>MENU_BY[it.r].type));S.customers=[]}return out};
+ try{
+  const d1=orders(1,40);
+  ok('D1. Ngày 1: chỉ bán nước (nước chai + pha chế)',d1.length>0&&d1.every(o=>o.every(tp=>tp==='bottle'||tp==='mix'))&&d1.some(o=>o.includes('mix')),`${d1.length} đơn`);
+  ok('D2. Ngày 1: mỗi lần gọi 1 món',d1.every(o=>o.length===1));
+  const d2=orders(2,40);
+  ok('D3. Ngày 2: có đồ chiên, chưa có mì, 1 món/lần',d2.some(o=>o.includes('fried'))&&d2.every(o=>!o.includes('noodle')&&o.length===1));
+  const d3=orders(3,40);
+  ok('D4. Ngày 3: có mì (món mới được ưu tiên), 1 món/lần',d3.some(o=>o.includes('noodle'))&&d3.every(o=>o.length===1));
+  const d4=orders(4,60),d6=orders(6,80);
+  ok('D5. Ngày 4–5 tối đa 2 món · ngày 6+ tối đa 3 món',d4.every(o=>o.length<=2)&&d4.some(o=>o.length===2)&&d6.every(o=>o.length<=3)&&d6.some(o=>o.length>=2));
+  S=newState();S.day=1;updateLocks();
+  ok('D6. Ngày 1: Bàn sơ chế, Bếp, Chảo, Thùng mì, Tủ đông bị khóa; Quầy pha nước mở',['board','stove','fryer','noodlebox','freezer'].every(s=>document.querySelector(`[data-act="kst"][data-id="${s}"]`).classList.contains('lockst'))&&!document.querySelector('[data-act="kst"][data-id="bar"]').classList.contains('lockst'));
+  S.day=2;updateLocks();
+  ok('D7. Ngày 2: mở Bàn sơ chế, Chảo, Tủ đông; Bếp, Thùng mì vẫn khóa',!document.querySelector('[data-act="kst"][data-id="fryer"]').classList.contains('lockst')&&document.querySelector('[data-act="kst"][data-id="stove"]').classList.contains('lockst'));
+  S.day=3;updateLocks();ok('D8. Ngày 3: mở hết trạm',!document.querySelectorAll('[data-act="kst"].lockst').length);
+  S.day=2;const p2=BUILD.prep();ok('D9. Đầu ngày có món mới → hiện “Món mới hôm nay”',p2.includes('ndcard')&&p2.includes(t('nd_fried_t')));
+  S.day=5;ok('D10. Ngày không có món mới → không hiện khung món mới',!BUILD.prep().includes('ndcard'));
+  S=newState();S.day=2;applyUpgrades();openShop();const tc=spawnCustomer({type:'sinhvien'});tc.order={id:1,items:[{r:'cavien',top:[],done:false}],t:0};tc.state='WAITING_FOOD';
+  const on=teachActive();S.today.sold.cavien=1;
+  ok('D11. Đơn đầu tiên của món mới → gợi ý nổi bật; bán xong 1 lần → tắt',on&&!teachActive());
+ }catch(err){ok('Lỗi test D: '+err.message,false)}
+ S=saved;SERVING=sv;TEST=false;NOSPAWN=false;applyUpgrades();if(S)updateLocks();return R}
+try{EXTRA_TESTS.push(runTestsD)}catch(e){setTimeout(()=>EXTRA_TESTS.push(runTestsD),0)}
 init();
 </script>
 </body>
