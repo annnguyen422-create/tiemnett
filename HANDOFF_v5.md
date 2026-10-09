@@ -1,235 +1,236 @@
-# TIỆM NET — HANDOFF v5 (đọc file này TRƯỚC khi làm bất cứ việc gì)
+# HANDOFF v5 — Tiệm Net
 
-> Cập nhật: 2026-10-09 · Thay thế HANDOFF.md cũ (đã lỗi thời).
-> **Nguồn sự thật về hành vi game = `v4.html` (đã dán đủ Patch A → H2).**
-> Nếu file này mâu thuẫn với code → tin code, rồi sửa file này.
-> Việc đang làm dở: **gộp v4 + patch thành file sạch `v5.html`** (mới gửi Phần 1/9).
-
----
-
-## 0. Quy tắc cho AI / developer
-
-1. Đọc hết file → mở `v4.html` → đối chiếu mục 5–6 trước khi đề xuất.
-2. **Không tự làm phase/feature mới.** Chủ project yêu cầu: *đưa checklist/đề xuất trước → được OK → mới code → chủ project test → mới qua bước sau.*
-3. Trả lời **tiếng Việt**, ngắn gọn, từng bước. Chủ project **không phải lập trình viên**, dùng **iPhone + Mac/Chrome**, sửa code bằng **github.dev** (nhấn phím `.` ở trang repo) hoặc trình sửa web GitHub.
-4. Khi gửi code:
-   - Ghi rõ **chỗ dán** bằng một mốc duy nhất (vd: "ngay trước dòng `init();`").
-   - **Mỗi khối code phải tự đóng ```**. Code dài → **chia nhiều tin nhắn, đánh số phần**, kết thúc mỗi phần bằng "nhắn *tiếp*".
-   - Kèm **checklist kiểm tra** + số bài test mong đợi.
-5. **Bộ nhớ đệm GitHub Pages ~10 phút**: luôn bảo chủ project mở bằng URL có số mới, vd `v4.html?v=12`, `v4.html?test&v=12`. Có dòng **"Bản: …"** trong ⚙️ Cài đặt để biết đã cập nhật chưa.
-6. Trong trình sửa web GitHub, Ctrl/Cmd+F chỉ chạy khi **bấm vào vùng code trước**; nếu không thì ô tìm của Chrome không thấy dòng ngoài màn hình. github.dev thì luôn tìm được.
-7. Chỉ đánh dấu **Completed** khi: self-test đạt **và** chủ project đã chơi tay.
+> Đọc file này trước khi sửa code. Viết cho người (hoặc AI) tiếp quản dự án.
+> Cập nhật: 09/10/2026 · Bản: **v5** (bản sạch, thay cho v4 + Patch A→H2)
 
 ---
 
 ## 1. Tổng quan
 
+Game quản lý tiệm net Việt Nam, chạy trên trình duyệt (điện thoại + máy tính).
+
 | Mục | Giá trị |
 |---|---|
-| Game | Tiệm Net — quản lý tiệm net Việt Nam, chibi, ấm áp |
-| Repo | `annnguyen422-create/tiemnett` (**2 chữ t**) |
-| Bản đang chơi | `https://annnguyen422-create.github.io/tiemnett/v4.html` |
-| Self-test | thêm `?test` (vd `v4.html?test&v=12`) hoặc ⚙️ Cài đặt → Chạy kiểm thử |
-| Bản cũ | `index.html` = v3 (3 lớp ghi đè, 98 test) — **chưa thay**, giữ dự phòng |
-| Bản đang làm | `v5.html` — bản sạch, mới gửi **Phần 1/9** (khung + CSS + config + data) |
-| Công nghệ | 1 file HTML + CSS + JS thuần, không build. Font Nunito. Toàn bộ hình là SVG tự vẽ |
-| Save | `localStorage`: `tiemnet_save_v3` (v4/v5 dùng chung) · `tiemnet_save_v1` (index.html cũ) · cờ `tiemnet_v3_imported` (đã nhập save cũ 1 lần) |
-| Repo khác | `chitieu` — app chi tiêu, không liên quan |
+| Link chơi | https://annnguyen422-create.github.io/tiemnett/ (hai chữ **t**) |
+| Repo | `tiemnett` |
+| File chính | `index.html` (= v5 sau khi test đạt) |
+| Bản dự phòng | `v4.html` (v4 + patch A→H2, chạy được, không sửa nữa) |
+| Công nghệ | 1 file HTML + CSS + JS thuần, không framework, không thư viện |
+| Font | Nunito (Google Fonts) |
+| Hình vẽ | SVG tự vẽ trong code, không dùng ảnh ngoài |
+| Save | `localStorage["tiemnet_save_v3"]` |
+| App phụ | Chi tiêu: https://annnguyen422-create.github.io/chitieu/ (repo `chitieu`, độc lập) |
+
+**Trạng thái:** v5 đã viết xong đủ 9 phần. **Chưa xác nhận test 151/151** — việc đầu tiên khi tiếp quản là chạy test (mục 3).
 
 ---
 
-## 2. Trạng thái
+## 2. Cấu trúc file v5 (9 phần, theo thứ tự trong `<script>`)
 
-- **v4 + Patch A→H2**: chủ project đã chơi tay và duyệt từng patch. Test mong đợi **139/139** (81 gốc + A5 + B12 + C8 + D11 + E4 + E2·5 + F5 + H4 + H2·4). Con số cuối cùng **chưa có ảnh xác nhận** → chạy lại `v4.html?test&v=…` để chốt.
-- **v5**: đã gửi Phần 1/9. Chưa rõ chủ project đã dán chưa. Các phần 2→9 **chưa viết**.
-- Chủ project đang ở save **ngày 7**, có/không có đầu bếp tuỳ save.
+| Phần | Nội dung | Hàm / hằng chính |
+|---|---|---|
+| HTML + CSS | Giao diện, toàn bộ CSS đã gộp patch | `#top` `#vp/#world` `#bar` `#carry` `#kbar` `#sheet` `#toasts` |
+| 1 Config + Data + Utils | Hằng số, dữ liệu món, kho, máy, khách | `CFG` `PAT` `COOK` `PREP` `UNLOCK` `ST_LOCK` `maxItemsOn` `ITEMS` `MENU` `KIT` `UPGRADES` `CTYPES` `budgetOf` |
+| 2 Text | Toàn bộ chữ hiển thị + thoại khách | `STR.vi` `t()` `DIALOGUE.vi` `line()` |
+| 3 State + Economy + Save | State, tiền, kho/lô, nhân viên, nâng cấp, lưu/tải | `newState` `applyUpgrades` `addTx` `recharge` `buyStock` `returnBottle` `hireStaff` `buyUpgrade` `deserialize` `migrateV1/V2/C` |
+| 4 Customers + Day | Khách, hàng chờ, gọi món, kiên nhẫn, vòng ngày | `queueFront` `spawnCustomer` `assignPC` `orderPatienceFor` `maybeOrder` `seatedTick` `stepSim` `endDay` `nextDay` |
+| 5 Kitchen + Matching + Delivery + Staff | Bếp, ghép món ↔ khách, giao món, AI nhân viên | `kBin` `kTap` `canFinish` `finishDish` `matchAll` `deliverTo` `cookStep` `cashierStep` |
+| 6 Art + World | SVG nhân vật, máy, món, trạm; dựng bản đồ | `charSVG` `wiSVG` `binSVG` `KSVG` `buildWorld` `fit` |
+| 7 Render | Vẽ mọi thứ mỗi khung hình | `renderTop` `renderMeta` `bubbleOf` `nextAction` `renderHL` `renderKBar` |
+| 8 Input + Sheets + Loop | Chạm, các bảng, vòng lặp chính, khởi động | `onWorld` `startDelivery` `BUILD.*` `ACT.*` `frame` `bind` `init` |
+| 9 Tests | Test tự động + bot tự chơi | `runTests` `simulateDay` `botAct` `checkInv` · cuối file: `init();` |
 
 ---
 
-## 3. Gameplay hiện tại (v4 + patch) — v5 PHẢI giữ nguyên
+## 3. Chạy test
 
-### 3.1 Vòng lặp ngày
-PREP (07:30, bảng chuẩn bị: dự báo, món mới hôm nay, nhập hàng, nhân viên, nâng cấp) → **Mở cửa** 08:00 → 23:00 ngừng nhận khách → 24:00 CLOSING (mọi khách về) → REPORT → Ngày mới (bỏ hàng hết hạn, tính lương).
-1 giây thật = 2 phút game. **Không còn tốc độ 2x/4x**; chỉ có ⏸ (đổi thành ▶ khi dừng). Khi dừng **không thao tác được trên bản đồ**.
+- Mở: `…/tiemnett/?test&v=N` (đổi `N` mỗi lần để không dính cache).
+- Hoặc trong game: **Cài đặt → Chạy kiểm thử**.
+- Kỳ vọng: **151/151** ✅.
 
-### 3.2 Mở món theo ngày + số món mỗi lần gọi
-| Ngày | Món mở | Món/lần |
+| Nhóm | Nội dung | Số bài |
+|---|---|---|
+| Q | Hàng chờ (gồm: đầu hàng chưa tới thì chưa phục vụ) | 10 |
+| K | Kiên nhẫn | 7 |
+| M | Nấu mì | 16 |
+| F | Đồ chiên | 6 |
+| W | Pha chế + nước chai | 7 |
+| G | Quầy ra món (khi đã mua) | 3 |
+| E | Trường hợp đặc biệt | 7 |
+| S | Nhân viên | 9 |
+| T | Tiền | 10 |
+| H | Hạn dùng | 2 |
+| P | Giá bán | 1 |
+| U | Nâng cấp | 3 |
+| R | Báo cáo cuối ngày | 5 |
+| V | Lưu / tải / chuyển save | 6 |
+| A | Giao diện gọn | 5 |
+| N | Chờ món, topping đúng y | 12 |
+| C | Quầy ra món là nâng cấp | 8 |
+| D | Mở món theo ngày | 11 |
+| X | Thẻ xN, nút "−", tag "Tiếp theo" | 18 |
+| BOT | Bot tự chơi trọn ngày | 5 |
+
+**Quy tắc:** mọi tính năng mới phải thêm test vào `runTests()` (Phần 9), đặt mã nhóm mới, không trùng mã cũ.
+
+---
+
+## 4. Quy ước code (bắt buộc giữ)
+
+1. **Mỗi hàm chỉ có MỘT bản.** Không ghi đè hàm (`foo=function…`), không bọc (`const _old=BUILD.x; BUILD.x=…`), không `MutationObserver`/`setInterval` để vá giao diện, không chồng `!important`. Muốn đổi → sửa thẳng hàm gốc.
+2. **Logic không đụng DOM.** Hiệu ứng (toast, âm thanh, chữ bay) đi qua `fx.*`, tự tắt khi `TEST=true`. Lớp CSS theo trạng thái (ẩn Quầy ra món, khóa trạm, chế độ dạy) chỉ đặt trong `renderMeta()`.
+3. **Hàm logic trả** `{ok:true,step}` hoặc `{ok:false,err,v}`; `err` là key trong `STR`.
+4. **Tiền chỉ thay đổi qua** `addTx(amount,type,desc)` (để sổ sách luôn khớp — test R2, BOT3).
+5. **Mọi chữ hiển thị nằm trong `STR.vi`** (Phần 2), không viết cứng tiếng Việt trong code (trừ vài nhãn SVG).
+6. **Save giữ `VERSION = 3`.** Thêm trường mới vào state → thêm giá trị mặc định trong `newState()` và trong `deserialize()` (để save cũ không lỗi). Đổi cấu trúc lớn → viết `migrateX()` chạy 1 lần, có cờ đánh dấu (như `verC`).
+7. **Gửi code theo kiểu "dán nối tiếp"** hoặc "thay nguyên hàm X" — người chủ dự án sửa trực tiếp trên GitHub, không dùng terminal.
+
+---
+
+## 5. State `S` (lưu vào save)
+
+```
+v=3 · verC=1 · phase PREP|OPEN|CLOSING|REPORT · day · time (phút game) · money · rating · paused
+pcs[] · inv{} · lots{id:[{n,exp}]} · prices{} · upg{} · staff{type,hand,t,st,serving}|null
+k{board[3],stove[2],fryer[2],bar[2]} · hand · sel{board,bar}
+carry[] (khay, ≤4 hoặc 6) · pickup[6] (Quầy ra món — chỉ dùng khi upg.pickup)
+customers[] · accounts{} (khách quen) · tx[] · history[] · seq{c,tx,order,dish}
+player{x,y,flip} · today{} · report · settings{sound,hints} · tutorialDone
+```
+
+- **Khách:** `TO_QUEUE → QUEUE (đầu hàng có thể SERVING) → TO_PC → PLAYING ⇄ WAITING_FOOD → EATING`, thêm `RECHARGE` (hết số dư) và `LEAVING`.
+- **Món đang làm (work item):** `raw` · `prep` · `bowl` · `pot` · `fry` · `fried` · `cup` · `trash`; `by:'cook'` = của đầu bếp, người chơi không đụng vào.
+- **Món xong (dish):** `{id,r,top,q}` nằm trong `carry[]` hoặc `pickup[]`.
+- **Đã bỏ khỏi v5:** `speed` (xóa khi tải save cũ).
+
+### Chuyển save
+| Hàm | Từ → đến | Khi nào chạy |
+|---|---|---|
+| `migrateV1` | v1 → v2 | `d.v===1` |
+| `migrateV2` | v2 → v3 (bếp mới, khay → carry, hàng chờ mới) | `d.v===2` |
+| `migrateC` | save trước Patch C | `verC` chưa có: có đầu bếp → tặng Quầy ra món (toast 🎁); không có → món trên quầy chuyển về khay |
+| Nhập save rất cũ | `tiemnet_save_v1` → v3 | 1 lần, cờ `tiemnet_v3_imported` |
+| Save hỏng / phiên bản lạ | sao lưu sang `tiemnet_save_v3_backup_<time>`, chơi mới | — |
+
+---
+
+## 6. Luật chơi đã chốt (KHÔNG đổi nếu chưa hỏi chủ dự án)
+
+### Vòng ngày
+CHUẨN BỊ 07:30 → MỞ CỬA 08:00 → 23:00 ngừng nhận khách → 24:00 đóng → BÁO CÁO → ngày mới.
+1 giây thật = 2 phút game. **Không có nút tốc độ**, chỉ ⏸/▶ (phím Space).
+
+### Mở món theo ngày
+| Ngày | Món mở | Tối đa món/lần gọi |
 |---|---|---|
 | 1 | Nước chai + pha chế | 1 |
 | 2 | + Đồ chiên | 1 |
 | 3 | + Mì | 1 |
-| 4–5 | tất cả | ≤2 |
-| 6+ | tất cả | ≤3 |
-- Trạm chưa mở: **xám + "🔒 Ngày N"**, không bấm được (`ST_LOCK`: board/freezer/fryer → ngày 2; noodlebox/stove → ngày 3).
-- Ngày ra món mới: khách **ưu tiên 60%** gọi món mới; bảng chuẩn bị có khung **"🆕 Món mới hôm nay"** (hình món + các bước + công thức pha) và dòng "Ngày mai mở thêm…".
-- **Teach mode**: đơn đầu tiên của món mới trong ngày → viền gợi ý **đỏ đậm, nhấp nhanh**; tắt khi đã bán món đó 1 lần.
+| 4–5 | Tất cả | 2 |
+| 6+ | Tất cả | 3 |
 
-### 3.3 Khách & hàng chờ
-- Trạng thái: `TO_QUEUE → QUEUE (→ SERVING) → TO_PC → PLAYING ⇄ WAITING_FOOD → EATING`, `RECHARGE`, `LEAVING`.
-- Hàng dọc trước quầy, tối đa 6 chỗ (`QUEUE_SPOTS`); có số thứ tự, người đang được phục vụ hiện ★. Hàng đầy → khách mới về luôn ("Đông quá…").
-- **Phục vụ đúng thứ tự đến**: `queueFront()` = người đầu `queueList()` **và phải đã tới nơi** (QUEUE/SERVING); nếu chưa tới thì cả hàng chờ.
-- Khi xếp hàng **không có bóng chat** (chỉ số thứ tự + thanh kiên nhẫn). Yêu cầu khách xem ở bảng quầy.
-- Bấm quầy / khách trong hàng → luôn mở **khách đầu hàng** (SERVING khi bảng mở; đóng bảng → về QUEUE).
+- Trạm chưa mở: xám + nhãn "🔒 Ngày N" (Bàn sơ chế/Tủ đông/Chảo = ngày 2; Thùng mì/Bếp = ngày 3).
+- Bảng chuẩn bị đầu ngày có khung "🆕 Món mới hôm nay" (các bước + công thức).
+- **Chế độ dạy:** đơn đầu tiên của món mới trong ngày → viền đỏ đậm, tag "Tiếp theo" bấm được. Bán món đó 1 lần → tắt.
 
-### 3.4 Kiên nhẫn (đã duyệt là "ổn")
-- Quầy: `80 × pat` phút game (×1,3 máy lạnh), giảm ×1/phút; SERVING không giảm.
-- Chờ món: `(40 + Σ phần theo món) × hệ số số món × pat` (×1,15 máy lạnh). Phần: nước chai 15, pha chế 35, đồ chiên 50, mì 60. Hệ số: 1 món ×1, 2 món ×1,15, 3 món ×1,3.
-- Tốc độ giảm: đang chơi ×0,7 · **món xong mà chưa giao ×1,6** · hết giờ/hết tiền nhưng còn chờ món ×1.
-- 4 mức tâm trạng: 😊 >66% · 🙂 >40% · 😐 >15% · 😠. Hủy đơn lần 2 (hoặc vui <20) → bỏ về.
-- **Khách chỉ gọi món nếu thời gian chơi còn lại ≥ Σ phần + 15** (bớt món lâu nhất cho vừa).
-- **Còn món đang chờ → khách KHÔNG về** dù hết giờ chơi hoặc hết tiền máy: ngồi chờ, không tính tiền máy. Nhận xong mới về.
+### Hàng chờ
+- 6 chỗ, số thứ tự, người đầu có ★. Hàng đầy → khách mới về luôn.
+- Chỉ phục vụ người đầu hàng **đã đứng tới quầy**; người đầu còn đang đi tới thì cả hàng chờ.
+- Khách xếp hàng **không có bóng chat** (chỉ số + thanh kiên nhẫn). Bấm quầy để xem yêu cầu.
 
-### 3.5 Làm món (đã duyệt)
-- **Mì**: Thùng mì (chọn loại) → Bàn sơ chế (**tự** xé gói → cho vào tô → nêm, 3′, có thanh tiến độ; tốn 1 tô) → thêm topping khách gọi → bấm tô để bưng → Bếp → vớt khi vạch vào vùng xanh.
-- **Đồ chiên**: Tủ đông → Chảo → vớt khi vàng giòn → Bàn sơ chế (**tự** bày đĩa + rưới tương, 2′; tốn đĩa + tương) → bấm đĩa.
-- **Pha chế**: Quầy pha nước → Ly → Đá → Trà/Cà phê → Chanh/Đào/Sữa → **tự lắc** (2′) → bấm ly. Sai công thức → hỏng.
-- **Nước chai**: Tủ lạnh → lên khay.
-- Món xong (người chơi làm) → **khay đang bưng** (`carry`, 4 món, 6 nếu có khay lớn).
-- Chất lượng: mì chưa chín 60/quá lửa 70; chiên 55/70; không đá 80; hỏng → thùng rác.
-- **Topping phải ĐÚNG Y** (thiếu hoặc dư đều không nhận). Khách nói "Không đúng món em gọi"; bảng khách hiện dòng đỏ cảnh báo.
-- Đang cầm gói mì/đồ chiên: bấm loại khác = **đổi**, bấm lại đúng loại = **trả về kho**.
-- **Tủ lạnh**: mỗi bấm = +1 chai lên khay; thẻ có **badge xanh xN** (góc phải) + **nút "−" đỏ** (góc trái, cùng cỡ badge) để trả 1 chai về tủ (ưu tiên chai **chưa có khách nhận**).
+### Kiên nhẫn
+- Xếp hàng: `80 × tính cách` (×1,3 nếu có máy lạnh), giảm 1/phút; đang được phục vụ = không giảm.
+- Chờ món: `(40 + Σ thời gian món) × hệ số số món × tính cách` (×1,15 máy lạnh).
+  Thời gian món: nước chai 15 · pha chế 35 · đồ chiên 50 · mì 60. Hệ số: 1 món ×1 · 2 món ×1,15 · 3 món ×1,3.
+- Tốc độ giảm: đang chơi ×0,7 · **món xong mà chưa giao ×1,6** · ngồi chờ (hết giờ/hết tiền) ×1.
+- 4 tâm trạng: 😊 >66% · 🙂 >40% · 😐 >15% · 😠.
+- Hủy đơn lần 2 hoặc vui vẻ <20 → bỏ về.
+- Chỉ gọi món khi thời gian chơi còn lại ≥ Σ thời gian món + 15 (bỏ bớt món chậm nhất cho vừa).
+- **Đang chờ món thì không bỏ về** dù hết giờ hay hết tiền: ngồi chờ, không tính tiền máy; nhận món xong hoặc hết kiên nhẫn mới về.
 
-### 3.6 Ghép món ↔ khách + giao món
-- `matchAll()`: mỗi món khách gọi (theo thứ tự gọi) được ghép với món/công đoạn tiến xa nhất **đúng loại**. Món đã xong (khay/quầy, tô/nồi) phải **đúng y topping**; tô đang ở Bàn sơ chế được ghép nếu chưa dư topping (để hiện nhãn "+rau").
-- Nhãn **"PC n"** trên món; khách có món sẵn sàng → **vòng xanh + mũi tên ▼**.
-- Bấm khách có vòng xanh / bấm món trên khay → nhân vật **tự đi lấy (nếu ở Quầy ra món) rồi bám theo đúng khách** để giao. Khách về giữa chừng → báo, món còn trên khay và tự ghép cho khách khác cùng món.
-- Bảng khách: mỗi món có trạng thái (Chưa làm / Đang sơ chế / Đang nấu / Đang bưng / Ở quầy ra món) + nút **"Giao món ➜"** khi sẵn sàng. "Báo hết hàng" chỉ hiện khi kho thật sự hết.
+### Nấu món
+- **Mì:** Thùng mì → Bàn sơ chế (tự xé gói → tô → nêm, 3 phút, tốn 1 tô) → thêm topping → bưng tô → Bếp → vớt khi vạch vào vùng xanh.
+- **Đồ chiên:** Tủ đông → Chảo → vớt khi vàng → Bàn sơ chế (tự bày đĩa + tương, 2 phút) → bấm đĩa.
+- **Pha chế:** Quầy pha nước → Ly → Đá → Trà/Cà phê → Chanh/Đào/Sữa → tự lắc 2 phút → bấm ly. Sai công thức = hỏng.
+- **Nước chai:** Tủ lạnh → khay. Mỗi lần bấm = +1 chai.
+- **Topping phải ĐÚNG Y** (không thiếu, không dư). Sai → khách không nhận, nói "Không đúng món"; bảng khách hiện cảnh báo đỏ.
+- Cầm loại khác cùng tủ → đổi; bấm lại đúng loại đang cầm → trả về kho.
 
-### 3.7 Gợi ý bước tiếp theo (Next Valid Action)
-- Trạm cần bấm tiếp: **viền vàng nhấp nháy**; hũ nguyên liệu khách cần: **nảy + nền xanh** (trên bản đồ và bàn thao tác).
-- Bàn thao tác (thanh dưới, hiện khi đứng ở một trạm): dòng "Cần làm: …", các thẻ, rồi **tag xanh "Tiếp theo: …"** (vd "Mang đi chiên", "Mang tô lên Bếp nấu", "Giao cho PC 5", "Bỏ vào Thùng rác").
-  - Tag **không bấm được**, trừ khi đang **teach mode** (làm món mới lần đầu) → thành nút có ➜, bấm thì đi tới trạm.
-  - Chưa có Quầy ra món → **không** hiện câu "đặt lên Quầy ra món".
-- Tắt toàn bộ gợi ý: ⚙️ Cài đặt → "Gợi ý bước tiếp theo".
-- **Đã bỏ hẳn**: thanh luồng món/chị Hai ở trên cùng; hàng tiêu đề bàn thao tác (vẫn đóng được bằng bấm ra ngoài); số đỏ "cần làm" trên thẻ; badge/hiệu ứng chọn trên các tủ **ở bản đồ**; phần "Đường đi của món" trong thực đơn.
+### Giao món
+- Món đã ghép với khách → khách có **vòng xanh + mũi tên ▼**.
+- Bấm khách / bấm món trên khay → người chơi tự đi (lấy ở Quầy ra món nếu cần) rồi **bám theo đúng khách**. Khách về giữa chừng → món ở lại khay, tự ghép khách khác.
 
-### 3.8 Nhân viên (chỉ 1 người)
-- **Thu ngân** (phí 400k, lương 150k/ngày, 1 việc/phút): gọi khách đầu hàng (SERVING) → nạp đúng số khách xin → xếp máy đúng loại; tự nạp khi khách đang chơi xin.
-- **Đầu bếp** (phí 700k, lương 200k/ngày, 1 thao tác/0,5 phút): tự làm trọn món (cả topping), không đụng món người chơi đang làm. Món xong: **có Quầy ra món → đặt lên quầy; chưa có → đặt lên khay của người chơi**; khay đầy → đứng chờ.
-- Lương tính cho mọi người đã làm trong ngày (kể cả cho nghỉ giữa ngày).
+### Gợi ý (tắt được: Cài đặt → Gợi ý bước tiếp theo)
+- Trạm tiếp theo: viền vàng nét đứt nhấp nháy. Ngăn cần lấy: nảy + nền xanh.
+- Bàn thao tác: dòng "Cần làm", rồi tag xanh **"Tiếp theo: …"** — chỉ là nhãn, **chỉ bấm được khi đang dạy món mới**.
+- Chưa có Quầy ra món → không bao giờ gợi ý "đặt lên Quầy ra món".
 
-### 3.9 Nâng cấp (mua 1 lần)
-Bếp hẹn giờ 900k · Chảo tự ngắt 1,2tr · Bếp từ (mì 6→4′) 700k · Chảo lớn (5→3,5′) 800k · Máy lắc (2→1′) 400k · Khay lớn (6 món) 500k · **Quầy ra món 800k (🔒 cần đang có đầu bếp)** · Màn hình 144Hz 2,4tr (+vui, +2k/giờ) · Ghế gaming 1,6tr (+20% giờ chơi, +vui) · Máy lạnh 1,5tr (+kiên nhẫn, +20k điện).
-- Quầy ra món: **ẩn trên bản đồ cho tới khi mua**. Save cũ đang có đầu bếp → **tặng sẵn** (chạy 1 lần, cờ `S.verC`). Save cũ không có đầu bếp mà quầy còn món → chuyển món về khay.
+### Bàn thao tác (thẻ dưới màn hình)
+- Thẻ đang chọn: sáng xanh + **badge xanh "xN"** góc trên phải.
+- Tủ lạnh: thêm **nút đỏ "−"** góc trên trái (cùng cỡ badge) để trả 1 chai, ưu tiên chai chưa có khách nhận.
+- **Ngăn tủ trên bản đồ: không badge, không sáng viền** (chỉ còn hiệu ứng nảy của gợi ý).
 
-### 3.10 Kho, hạn dùng, giá
-- Đồ chiên quản lý **theo lô** (cá viên 3 ngày, bò viên 3, tôm viên 2, xúc xích 4, hồ lô 3), lô cũ dùng trước, hết hạn tự bỏ đầu ngày (báo ở bảng chuẩn bị).
-- Đổi giá trong 🍜 Đồ ăn: −/+ 1.000đ, giới hạn 50–200% giá gốc; hiện vốn + % lãi; giá cao hơn gốc → khách có xác suất bỏ món (`min(0,9; (tỉ lệ−1)×1,2)`).
+### Nhân viên (tối đa 1 người)
+| Ai | Phí tuyển | Lương/ngày | Tốc độ | Việc |
+|---|---|---|---|---|
+| Thu ngân | 400k | 150k | 1 việc/phút | Gọi người đầu hàng, nạp đúng số khách xin, xếp đúng loại máy, tự nạp cho khách đang chơi |
+| Đầu bếp | 700k | 200k | 1 việc/0,5 phút | Nấu trọn đơn (đúng topping), không đụng món người chơi đang làm. Món xong → Quầy ra món nếu có, **không thì lên khay người chơi**; khay đầy thì đứng chờ |
 
-### 3.11 Giao diện
-- **Thanh trên luôn 1 hàng**: `☀️ N7 · 11:00 | 💰 6,63tr | ⭐ 3.8 | 🟢 Mở | ⏸` (màn hẹp <600px dùng dạng rút gọn; màn rộng dùng chữ đầy đủ).
+Lương trả cuối ngày cho người có làm trong ngày.
+
+### Nâng cấp (mua 1 lần)
+Bếp hẹn giờ 900k · Chảo tự ngắt 1,2tr · Bếp từ (6→4 phút) 700k · Chảo lớn (5→3,5 phút) 800k · Máy lắc (2→1 phút) 400k · Khay lớn (6 món) 500k · **Quầy ra món 800k (🔒 cần đang có đầu bếp)** · Màn hình 144Hz 2,4tr · Ghế gaming 1,6tr · Máy lạnh 1,5tr.
+Quầy ra món ẩn trên bản đồ cho tới khi mua.
+
+### Kinh tế
+- Vốn đầu: 5.000.000đ.
+- Chi phí cuối ngày: điện 40k + 2.500đ/giờ máy (+20k nếu có máy lạnh) · Internet 50k · Bảo trì 30k.
+- Hạn dùng (ngày): cá viên 3 · bò viên 3 · tôm viên 2 · xúc xích 4 · hồ lô 3. Theo lô, dùng lô cũ trước, tự bỏ đầu ngày, báo ở bảng chuẩn bị.
+- Giá bán: ±1.000đ, trong khoảng 50–200% giá gốc; giá cao hơn gốc → khách ít gọi món đó.
+
+### Giao diện
+- Thanh trên 1 hàng: `☀️ N7·11:00 | 💰 6,63tr | ⭐ 3.8 | 🟢 Mở | ⏸` (màn hẹp <600px rút gọn).
 - Thanh dưới 7 nút: Máy · Đồ ăn · Kho · Doanh thu · Nhân viên · Nâng cấp · Cài đặt.
 - Góc dưới trái: "Tay: … | Khay n/4: …" (ẩn khi bàn thao tác mở).
-- Bản đồ 960×600: kho/bếp hàng trên; quầy thu ngân + làn "🧍 XẾP HÀNG" bên trái; 8 máy giữa; Quầy ra món bên phải (khi đã mua).
+- Bản đồ 960×600: bếp hàng trên; quầy + hàng chờ bên trái; 8 máy ở giữa; Quầy ra món bên phải (khi đã mua).
+- Cài đặt có dòng **"Bản: v5"** (`CFG.BUILD`).
 
 ---
 
-## 4. Số liệu cân bằng
+## 7. Lỗi đã biết (chưa sửa)
 
-| | |
+| Mã | Mô tả |
 |---|---|
-| Tiền đầu | 5.000.000đ |
-| Giá giờ | Thường 8k · Gaming 12k · VIP 18k (+2k màn hình 144Hz). 8 máy: 3 Gaming + 1 VIP hàng trên, 4 Thường hàng dưới |
-| Chi phí ngày | Điện 40k + 2.500đ/giờ máy (+20k máy lạnh) · Internet 50k · Bảo trì 30k · Lương nhân viên |
-| Nấu | Mì chín 6′ (4′ bếp từ), vùng ngon 6′, hỏng ở +14′ · Chiên 5′ (3,5′), vùng ngon 4′, cháy ở +10′ · Sơ chế mì 3′, đồ chiên 2′ · Lắc 2′ (1′) |
-| Giá món | Mì tôm 12k · Mì bò/gà 14k · Mì cay 15k · Cá viên 18k · Bò viên 20k · Tôm viên 22k · Xúc xích chiên 12k · Hồ lô 14k · Trà chanh 8k · Trà đào/Cà phê sữa 12k · Nước chai 6–13k |
-| Topping | Trứng +5k · Xúc xích +8k · Cá viên +12k · Rau +2k |
-| Hài lòng khi giao | q≥90 +8 · ≥70 +4 · ≥50 0 · <50 −8 · giao nhanh +4 |
-| Thương hiệu hư cấu | `BRAND`: Sấm Sét, Cola Mát, Suối Mát, Chanh Sủi |
+| BUG-003 | Mở bảng quầy thì khách đầu hàng không mất kiên nhẫn → có thể lợi dụng |
+| BUG-008 | Nút "Số khác" dùng `prompt()` → bị chặn trong trình duyệt nhúng |
+| BUG-010 | Khách không đủ tiền mặt vẫn ghi đủ doanh thu món |
+| BUG-012 | Mua nâng cấp tốc độ bếp/chảo, thanh thời gian trên bản đồ chưa cập nhật ngay |
+| — | Không có tìm đường (nhân vật đi xuyên đồ vật) · tiền có thể âm |
+
+## 8. Việc chờ quyết định
+
+- Lộ trình phase chính thức (PROJECT_STATUS vs spec gốc).
+- Ghi doanh thu nạp tiền lúc nạp hay lúc khách dùng giờ máy.
+- Phí tuyển + nâng cấp tính là chi phí vận hành hay đầu tư.
+
+## 9. Kế hoạch tiếp theo
+
+**Bước ngay:** chạy test v5 → 151/151 → đổi tên `index.html` → `v4.html`, `v5.html` → `index.html` → mở game kiểm tra save cũ + "Bản: v5".
+
+**v5.1 — "Chất net Việt Nam"** (đã đề xuất, chủ dự án chưa chọn):
+- Dễ: thoại chất hơn ("máy 7 lag quá", "team ngu quá"), biệt danh kiểu in-game, bảng giá viết tay.
+- Vừa: món net (mì xào bò, cơm chiên, trứng ốp la, bánh mì, nước tăng lực, trà đá, bim bim, hướng dương); học sinh mặc đồng phục bị phụ huynh đến đón; gói chơi đêm 22h–6h; khách quen ghi sổ nợ; bán thẻ game.
+- Lớn: cúp điện (mua máy phát), đứt cáp quang (lag cả ngày), chuột/phím hỏng, mưa đông khách, mùa thi ít học sinh, giải đấu cuối tuần.
+- Hình: biển LED "INTERNET · GAME ONLINE", quạt trần, ghế nhựa đỏ → ghế gaming, xe máy trước cửa, dép để ngoài.
+- Dùng **tên chế / tên chung** cho game và thương hiệu (tránh bản quyền), như đã làm với nước chai (`BRAND`).
+
+**Spec gốc chưa làm:** mạng & lag · sửa/bảo trì máy · dọn dẹp · nâng cấp từng máy · sự kiện ngẫu nhiên · thời tiết/giải đấu/mùa · mở rộng 12→64 máy · phòng VIP · lên hạng tiệm · khách VIP · trang trí · thành tựu · thống kê tuần/tháng · thanh toán QR/ví · vay nợ & thua cuộc · nhạc nền · đổi ngôn ngữ.
 
 ---
 
-## 5. Kiến trúc v4.html (bản đang chạy)
+## 10. Lịch sử phiên bản
 
-**Cấu trúc file**: Phần 1 (HTML+CSS+config+data) → 2 (STR/DIALOGUE) → 3 (state, fx, economy, save) → 4 (khách, ngày) → 5 (bếp, matching, giao món, AI nhân viên) → 6 (art SVG, buildWorld) → 7 (render) → 8 (input, sheets, ACT, bind, frame, init) → 9 (runTests 81 bài, bot) → **Patch A…H2** → `init();`
-
-**Cơ chế patch**: khai báo lại `function` cùng tên (bản cuối theo thứ tự trong file thắng) **hoặc** gán lại lúc chạy (`maybeOrder=function…`, `renderKBar=…`, `syncNext=…`, thắng bất kể vị trí). Test bổ sung đăng ký vào `EXTRA_TESTS` (`try{push}catch{setTimeout(push)}`), chạy bằng `runAllTests()`.
-
-| Patch | Nội dung | Ghi đè / thêm |
-|---|---|---|
-| A | Thanh trên 1 hàng, bỏ tốc độ & ô số khách, ẩn thanh luồng món & tiêu đề bàn thao tác (CSS), không bóng chat khi xếp hàng | `renderTop`, `bubbleOf`, `init`, `EXTRA_TESTS`, `runAllTests` |
-| B | Kiên nhẫn nhiều món, gọi món theo giờ còn lại, không về khi còn chờ món, topping đúng y | `orderPatienceFor`, `maybeOrder`, `seatedTick`, `matchAll`, `deliverTo`, bọc `BUILD.cust` |
-| B-fix | Sửa tay 2 dòng: `queueFront` (người đầu hàng phải đã tới) · `orderReady` dùng `refreshMatch()` | sửa trực tiếp Phần 4/5 |
-| C | Quầy ra món thành nâng cấp (cần đầu bếp), đầu bếp → khay khi chưa có quầy, tặng quầy cho save cũ | `applyUpgrades` (+class `nopu`), `canFinish`, `finishDish`, `buyUpgrade`, `BUILD.upg`, `hasPickup`; sửa test Phần 9 (`S.upg.pickup=true;` trước `const sc=seat();`) |
-| D | Mở món theo ngày, số món/lần, khóa trạm, món mới hôm nay, teach mode | gán lại `maybeOrder`; `updateLocks`, `teachActive` (setInterval); bọc `BUILD.prep`; sửa test Phần 9 (`S.day=3;` trong `simulateDay`) |
-| E | Bỏ số "cần làm" trên thẻ; x1 khi chọn; thực đơn bỏ "Đường đi" | gán lại `renderKBar`; `BUILD.orders` |
-| E2 | Badge xN + viền chọn trên tủ ở bản đồ (sau đó bị G ẩn) | `binQty`, `updateBinQty` (setInterval) |
-| F v2 | Nút "−" trả chai | `returnBottle`, `syncFridgeMinus` (MutationObserver + setInterval) |
-| G v2 / G3 | Badge xanh, "−" đỏ cùng cỡ badge, ẩn badge tủ trên bản đồ, nhãn "Bản: …" | chỉ CSS + bọc `BUILD.set` |
-| H / H2 | Tag "Tiếp theo" dưới hàng thẻ; chỉ bấm được ở teach mode; bỏ "đặt lên Quầy" khi chưa có quầy | `syncNext` (observer+interval), `nextActionTag`, `STR.nx_*` |
-
----
-
-## 6. Kế hoạch v5 (bản sạch) — đang làm
-
-**Mục tiêu**: 1 file `v5.html`, **mỗi hàm 1 bản**, không patch/observer/interval vá, không `!important` chồng; hành vi **y hệt mục 3**; giữ save (`tiemnet_save_v3`, VERSION 3); dòng "Bản: v5" trong Cài đặt. Sau khi đạt test → đổi `v5.html` thành `index.html`, giữ `v4.html` dự phòng.
-
-**Đã gửi — Phần 1/9** (khung + CSS gộp + config + data):
-- HTML: `#top` gồm `#cDay #cMoney #cRate #bStatus #bPause` (không còn `#speeds`, `#cPeople`, `#hint`); `#vp>#wrap>#world`; `#bar` 7 nút có `data-t`; `#carry`, `#kbar`, `#sheetBg`, `#sheet`, `#toasts`.
-- CSS đã gộp mọi patch; class dùng tiếp: `.lockst .lockb` (khóa trạm, `.lockb` chỉ hiện khi cha có `.lockst`) · `.nopu` (ẩn quầy) · `.teach` · `.kbs .qty` (badge xanh) · `.kbs .minus` (nút "−" đỏ) · `.knext .tg(.btn)` · `.ndcard .ndic` · `.oitem`.
-- Config/data mới: `CFG.BUILD='v5'`; `PAT.multi=[1,1,1.15,1.3]`, `PAT.drainWait=1`; `UNLOCK`, `ST_LOCK`, `maxItemsOn(d)`; `UPGRADES` có `{id:'pickup',price:800000,req:'cook'}`; `CABINETS`; tiện ích `budgetOf(it)`. Đã bỏ `ROUTE`.
-
-**Còn phải viết** (mỗi phần dán nối tiếp cuối file):
-| Phần | Nội dung (gộp từ v4 + patch) |
+| Bản | Nội dung |
 |---|---|
-| 2 | `STR.vi` gộp + `DIALOGUE`. Bỏ key không dùng: `rt_* fl_* h_* guide_* nx_park nx_pickup btn_*?` (giữ `btn_deliver`, `btn_oos`). Thêm: `sts_*`, `upg_pickup…`, `err_need_cook`, `err_wrong_top`, `err_nothing_return`, `kb_return_one`, `nd_*`, `lock_day`, `nx_prefix`, `toast_pickup_gift`, `wrong_top`, `pricey`… |
-| 3 | state (`newState` có `verC:1`), fx, economy (`recharge`, `buyStock`, lô hàng, `setPrice`, `hireStaff/fireStaff`, `buyUpgrade` có `req`), `returnBottle`, save + `migrateV1/V2` + **migrateC** (tặng quầy) trong `deserialize`, `applyUpgrades` **thuần logic** |
-| 4 | khách: `queueFront` đã sửa, `spawnCustomer`, `maybeOrder` (bản D: mở theo ngày + ưu tiên món mới + giới hạn số món + cắt theo giờ còn lại), `orderPatienceFor` (bản B), `seatedTick` (bản B), checkout/leave, ngày (`endDay`, `nextDay` có `expireLots`) |
-| 5 | bếp `kBin/kTap/…`, `canFinish/finishDish` (bản C), `matchAll` (bản B), `orderReady` dùng `refreshMatch()`, `deliverTo` (bản B), `cookStep` dùng `canFinish()` thay vì "quầy còn chỗ", `cashierStep` |
-| 6 | art SVG + `buildWorld` (gắn sẵn `.lockb` vào trạm khóa được; không tạo badge trên tủ bản đồ) |
-| 7 | render: `renderTop` (bản A), `bubbleOf` (bản A), `renderKitchen`, `renderCustomers`, `nextAction` + `nextActionTag` (bản H2), `renderHL`, `renderCarry`, `renderKBar` (gộp E+F+G3+H2: badge xN, nút "−", tag "Tiếp theo" **vẽ trực tiếp**, không observer), `renderMeta` (class `nopu`, `teach`, khóa trạm) |
-| 8 | input (`onWorld`, `startDelivery`, kbar xử lý `ret:` và `nx:`), `BUILD.*` (orders không có "Đường đi"; prep có khung món mới; upg có khóa; set có "Bản: v5"), `ACT`, `bind`, `frame`, `init` (không còn `EXTRA_TESTS`) |
-| 9 | **một** `runTests()` gộp ≈134 bài (81 gốc đã sửa + A/B/C/D/E/F/H/H2; bỏ 5 bài E2 vì đã bỏ badge trên bản đồ), bot (`simulateDay` bắt đầu ngày 3), `init();</script></body></html>` |
-
----
-
-## 7. Nhật ký quyết định của chủ project
-
-- Kiên nhẫn & luồng nấu v4: **ổn**, giữ nguyên.
-- Topping: **đúng y**.
-- Đầu bếp chưa có quầy: **như bản cũ** → món lên khay người chơi.
-- Ngày 1: **cả nước chai lẫn pha chế**. Ngày 2 đồ chiên, ngày 3 mì.
-- Số món/lần theo bảng mục 3.2; đơn 3 món kiên nhẫn chậm hơn.
-- Nút trả chai: **phương án A** (nút "−" trên thẻ), **không** làm "trả từ khay".
-- "−" **đỏ**, badge **xanh**, **cùng kích thước**, nằm 2 góc trên.
-- Tủ trên bản đồ: **không badge, không hiệu ứng chọn**, chỉ hình chai/gói/xiên. (Gợi ý nảy của Next Valid Action **vẫn giữ** — chưa có yêu cầu bỏ.)
-- Tag "Tiếp theo": **chỉ là tag**, chỉ bấm được khi làm món mới lần đầu.
-- Cách giao code: **mỗi phase 1 khối dán**, rồi gộp thành bản sạch.
-
-### Còn chờ chốt (từ trước)
-- Roadmap phase chính thức (PROJECT_STATUS vs spec gốc).
-- Doanh thu ghi khi nạp (số dư chưa dùng vẫn tính lợi nhuận) — có đổi không.
-- Phí tuyển/nâng cấp tính vào chi phí ngày mua — có tách "đầu tư" không.
-
----
-
-## 8. Lỗi & nợ kỹ thuật còn lại (sẽ xử lý trong/ sau v5)
-- BUG-003: bảng quầy đang mở → khách đầu hàng không giảm kiên nhẫn (cố ý, nhưng có thể lạm dụng).
-- BUG-008: nút "Số khác" dùng `prompt()` — có thể bị chặn trong trình duyệt nhúng (Zalo/Facebook).
-- BUG-010: khách thiếu tiền mặt vẫn ghi đủ doanh thu món.
-- BUG-012: vạch vùng ngon trên bản đồ không đổi ngay sau khi mua bếp/chảo nhanh.
-- Nhân vật đi xuyên đồ vật; tiền có thể âm không hậu quả.
-- Đã sửa trong v4: hàng chờ sai thứ tự, khách về khi món đang làm, topping thiếu vẫn nhận, test thiếu vốn, kiểm tra món sẵn sàng dùng dữ liệu cũ.
-
----
-
-## 9. Spec gốc — chưa làm
-Internet & lag · máy hỏng/sửa máy · dọn bàn/rác · nâng cấp linh kiện từng PC · sự kiện ngẫu nhiên (5 khách cùng lúc, máy đứng hình, đổ nước, xin nợ, dẫn bạn) · thời tiết/giải đấu/mùa lễ · mở rộng 12→64 máy, phòng VIP, cấp độ tiệm · khách VIP · trang trí · thành tích · analytics tuần/tháng · thanh toán QR/ví · vay vốn & game over · nhạc nền · đổi ngôn ngữ.
-
----
-
-## 10. Bước tiếp theo
-1. Chạy `v4.html?test&v=…` → xác nhận **139/139**.
-2. Làm tiếp **v5 Phần 2 → 9** theo mục 6 (Phần 1 đã có). Đạt test → đổi thành `index.html`.
-3. Cập nhật file này (mục 2, 5, 6, 8).
-4. Chờ chủ project chọn hướng mới (mục 7 "còn chờ chốt" hoặc mục 9).
-
----
-
-## 11. Mẫu tin nhắn mở đầu phiên mới
-Đính kèm **`HANDOFF_v5.md` + `v4.html`** (và `v5.html` nếu đã dán Phần 1), rồi gửi:
-
-> Đây là game "Tiệm Net". Hãy đọc HANDOFF_v5.md trước, đối chiếu với v4.html (bản đang chạy, có Patch A→H2).
-> Việc hôm nay: [vd: viết tiếp v5 từ Phần 2 / sửa lỗi X / tính năng Y].
-> Nhớ: đề xuất + checklist trước, mình OK rồi mới code; chia phần, mỗi phần nhắn "tiếp".
+| v4 | Phần 1–9 + Patch A (thanh trên gọn, bỏ tốc độ, bỏ bóng chat khi xếp hàng) · B (kiên nhẫn theo số món, ngồi chờ món, topping đúng y) · B-fix (đầu hàng phải tới nơi) · C (Quầy ra món là nâng cấp) · D (mở món theo ngày, dạy món mới) · E/E2 (badge xN) · F (nút "−" trả chai) · G/G3 (màu, cỡ badge, gọn tủ bản đồ) · H/H2 (tag "Tiếp theo") |
+| **v5** | Viết lại sạch toàn bộ v4 + patch: mỗi hàm 1 bản, không observer/interval vá UI, `renderMeta` gom lớp CSS trạng thái, `migrateC` chạy lúc tải save, 1 hàm `runTests` 151 bài. Hành vi giữ nguyên v4. |
