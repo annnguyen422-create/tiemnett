@@ -1758,7 +1758,74 @@ function runTests(){
  S=saved;SERVING=sv;MATCH=sm;TEST=false;NOSPAWN=false;ACTOR='player';
  try{console.table(R)}catch(e){}
  return R}
-
+/* ================= PATCH A — GỌN GIAO DIỆN ================= */
+Object.assign(STR.vi,{sts_prep:'▶ Mở cửa',sts_open:'🟢 Mở',sts_closing:'🟠 Sắp đóng',sts_report:'🔴 Đóng',err_paused:'Đang tạm dừng — bấm ▶ để chơi tiếp.'});
+(function(){
+ const st=document.createElement('style');
+ st.textContent=`
+#top{flex-wrap:nowrap;gap:5px;padding:6px 8px;overflow:hidden}
+#top .chip{font-size:13px;padding:4px 8px;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#bStatus{flex:none;font-size:12px;min-height:32px;padding:2px 10px;white-space:nowrap}
+#speeds{margin-left:auto;flex:none}
+#speeds button{min-width:42px;font-size:15px}
+#hint{display:none}
+.kbt{display:none}
+#toasts{top:60px}
+@media(min-width:700px){#top .chip{font-size:14px;padding:5px 10px}#bStatus{font-size:13px}}`;
+ document.head.appendChild(st);
+ document.querySelectorAll('#speeds [data-sp]').forEach(b=>{if(b.dataset.sp!=='0')b.remove()});
+ const cp=$('cPeople');if(cp)cp.remove();
+})();
+/* Thanh trên: 1 hàng — ngày/giờ · tiền · đánh giá · trạng thái · tạm dừng. Không còn tốc độ 2x/4x. */
+function renderTop(){
+ S.speed=1;const narrow=window.innerWidth<600;
+ setT($('cDay'),`${PERIOD_ICON[period(S.time)]} ${narrow?'N'+S.day:t('day',{d:S.day})} · ${hhmm(Math.floor(S.time))}`);
+ setT($('cMoney'),'💰 '+(narrow?vk(S.money):vnd(S.money)));
+ setT($('cRate'),'⭐ '+S.rating.toFixed(1));
+ const b=$('bStatus'),k={PREP:'prep',OPEN:'open',CLOSING:'closing',REPORT:'report'}[S.phase],lbl=t((narrow?'sts_':'st_')+k);
+ if(b._k!==k+lbl){b._k=k+lbl;b.className=k;b.textContent=lbl}
+ const pb=document.querySelector('#speeds [data-sp="0"]');
+ if(pb){const s=S.paused?'▶':'⏸';if(pb._s!==s){pb._s=s;pb.textContent=s;pb.classList.toggle('on',S.paused);pb.setAttribute('aria-label',S.paused?'Chơi tiếp':'Tạm dừng')}}}
+/* Khách đang xếp hàng: không hiện bóng chat (chỉ còn số thứ tự + thanh kiên nhẫn) */
+function bubbleOf(c){
+ if(inQueue(c))return null;
+ const mo=moodOf(c),mi=mo?`<span class="md">${MOOD_ICON[moodKey(mo.f)]}</span> `:'',mk=mo?moodKey(mo.f):'';
+ if(c.state==='LEAVING')return c.say?{k:'s'+c.say.text,html:esc(c.say.text)}:null;
+ if(c.order){const st=c.order.items.map((it,i)=>it.done?'':itemStatus(c,i));
+  const k='o'+c.order.items.map((it,i)=>it.r+(it.top||[]).join('')+st[i]).join(',')+mk;
+  const html=mi+c.order.items.map((it,i)=>{if(it.done)return'';const s=st[i],cls=s==='os_carry'||s==='os_pickup'?'rd':s==='os_todo'?'':'wip';
+   return`<span class="oi ${cls}">${wiSVG({k:'dish',r:it.r,top:it.top},22)}</span>`}).join('');
+  return{k,cls:'order',html}}
+ if(c.state==='RECHARGE'||c.rechargeReq)return{k:'r'+c.rechargeReq+mk,cls:'money',html:mi+'💰 '+esc(c.joke?t('b_more'):t('b_recharge',{amt:vk(c.rechargeReq||10000)}))};
+ if(c.say)return{k:'s'+c.say.text,html:esc(c.say.text)};
+ if(c.state==='EATING')return{k:'eat',html:'😋'};return null}
+/* Bộ test bổ sung theo từng patch */
+function runTestsA(){
+ const R=[],ok=(n,c,i)=>R.push({n,pass:!!c,info:i||''}),saved=S,sv=SERVING;TEST=true;NOSPAWN=true;SERVING=null;
+ const until=(fn,max)=>{for(let i=0;i<(max||600)&&!fn();i++)stepSim(1);return!!fn()};
+ try{
+  S=newState();openShop();S.time=18*60;
+  const c=spawnCustomer({type:'hocsinh'});
+  ok('A1. Khách đang đi tới quầy: không có bóng chat',c.state==='TO_QUEUE'&&bubbleOf(c)===null);
+  ok('A2. Khách đứng trong hàng: không có bóng chat',until(()=>c.state==='QUEUE',40)&&bubbleOf(c)===null);
+  ok('A3. Vẫn còn thanh kiên nhẫn khi xếp hàng',!!moodOf(c));
+  c.balance=50000;assignPC(c,S.pcs[4]);until(()=>c.state==='PLAYING',40);c.gamingTime=9999;maybeOrder(c,true);
+  ok('A4. Khách đã ngồi máy gọi món: vẫn hiện bóng món',(bubbleOf(c)||{}).cls==='order');
+  S.speed=4;renderTop();
+  ok('A5. Không còn tốc độ nhanh: game luôn chạy 1x',S.speed===1);
+ }catch(e){ok('Lỗi test A: '+e.message,false)}
+ S=saved;SERVING=sv;TEST=false;NOSPAWN=false;return R}
+const EXTRA_TESTS=[runTestsA];
+function runAllTests(){let R=runTests();for(const f of EXTRA_TESTS)R=R.concat(f());applyUpgrades();refreshMatch();return R}
+ACT.test=()=>{UI.testRes=runAllTests();openSheet('tests')};
+function init(){
+ S=loadGame();const fresh=!S;if(!S)S=newState();
+ bind();buildWorld();fit();requestAnimationFrame(fit);applyUpgrades();refreshMatch();
+ if(UI.migrated)setTimeout(()=>fx.toast(t('migrated'),'ok'),400);
+ if(UI.saveBad)setTimeout(()=>fx.toast(t('save_bad'),'bad'),400);
+ if(fresh){UI.prepShown=true;openSheet('welcome')}
+ if(/[?&]test\b/.test(location.search)){UI.testRes=runAllTests();openSheet('tests')}
+ requestAnimationFrame(n=>{last=n;frame(n)})}
 init();
 </script>
 </body>
