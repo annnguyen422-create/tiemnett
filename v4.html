@@ -2231,6 +2231,48 @@ try{EXTRA_TESTS.push(runTestsF)}catch(e){setTimeout(()=>EXTRA_TESTS.push(runTest
  border:2px solid var(--dark)!important;border-radius:999px!important;background:var(--bad)!important;color:#fff!important;text-align:center!important;transform:none;z-index:3}
 #kbar .kbs button[data-kb^="bin:fridge:"] > span.minus::before{content:'';position:absolute;inset:-10px}`;document.head.appendChild(st)})();
 const _setG3=BUILD.set;BUILD.set=function(){return _setG3().replace('v4-G2','v4-G3')};
+ /* ================= PATCH H — DÒNG "TIẾP THEO" DƯỚI HÀNG THẺ ================= */
+Object.assign(STR.vi,{nx_fryer:'Mang đi chiên',nx_board:'Mang tới Bàn sơ chế',nx_stove:'Mang tô lên Bếp nấu',nx_trash:'Bỏ vào Thùng rác',nx_deliver:'Giao cho {pc}',nx_prefix:'Tiếp theo:'});
+(function(){const st=document.createElement('style');st.textContent=`
+#kbar .knext{display:flex;padding:6px 2px 2px}
+#kbar .knext .tg{display:inline-flex;align-items:center;gap:6px;min-height:40px;background:#E5F6EC;border:2px solid var(--ok);color:#2f8a47;border-radius:999px;padding:4px 14px;font-weight:900;font-size:14px;cursor:pointer}
+#kbar .knext .tg b{color:#1f6b33}`;document.head.appendChild(st)})();
+function syncNext(){const kb=$('kbar');if(!kb||!S)return;
+ let row=kb.querySelector('.knext');
+ const live=(S.phase==='OPEN'||S.phase==='CLOSING')&&UI.at&&!UI.walk&&S.settings.hints!==false;
+ const act=live?nextAction(refreshMatch()):null;
+ if(!act||!act.msg){if(row)row.remove();return}
+ const to=act.cust?'cust:'+act.cust:act.st?'st:'+act.st:'',key=act.msg+'|'+to;
+ if(row&&row._k===key&&row===kb.lastElementChild)return;
+ if(!row){row=document.createElement('div');row.className='knext'}
+ row._k=key;row.innerHTML=`<span class="tg" ${to?`data-nx="${to}" role="button"`:''}>${t('nx_prefix')} <b>${esc(act.msg)}</b>${to?' ➜':''}</span>`;
+ kb.appendChild(row)}
+(function(){const kb=$('kbar');if(!kb)return;
+ new MutationObserver(()=>syncNext()).observe(kb,{childList:true});
+ setInterval(()=>{if(!TEST)syncNext()},150);
+ kb.addEventListener('click',e=>{const b=e.target.closest('[data-nx]');if(!b)return;e.stopPropagation();
+  if(S.paused){fx.err('err_paused');return}
+  const[k,v]=b.dataset.nx.split(':');
+  if(k==='cust'){startDelivery(custById(+v));return}
+  const sp=v==='pickup'?CFG.PICKUP_SPOT:KIT[v]?{x:KIT[v].x+KIT[v].w/2,y:CFG.KIT_Y}:null;if(!sp)return;
+  walkTo(sp.x,sp.y,()=>{UI.at=v})})})();
+const _setH=BUILD.set;BUILD.set=function(){return _setH().replace(/v4-G\d?/,'v4-H')};
+function runTestsH(){
+ const R=[],ok=(n,c,i)=>R.push({n,pass:!!c,info:i||''}),saved=S,pAt=UI.at,pW=UI.walk,kb=$('kbar');TEST=true;NOSPAWN=true;
+ const show=st=>{UI.at=st;UI.walk=null;kb._k=null;renderKBar();syncNext();const r=kb.querySelector('.knext');return r?r.textContent:''};
+ try{
+  S=newState();S.day=3;applyUpgrades();openShop();
+  kBin('freezer','cavien');
+  ok('H1. Lấy cá viên → dưới hàng thẻ hiện "Tiếp theo: Mang đi chiên"',show('freezer').includes(t('nx_fryer')));
+  S.hand={k:'bowl',b:'mi',top:[]};
+  ok('H2. Đang bưng tô → "Tiếp theo: Mang tô lên Bếp nấu"',show('board').includes(t('nx_stove')));
+  S.hand={k:'trash'};
+  ok('H3. Món hỏng → "Tiếp theo: Bỏ vào Thùng rác"',show('fryer').includes(t('nx_trash')));
+  S.settings.hints=false;
+  ok('H4. Tắt gợi ý trong Cài đặt → không hiện dòng tiếp theo',show('fryer')==='');
+ }catch(err){ok('Lỗi test H: '+err.message,false)}
+ S=saved;TEST=false;NOSPAWN=false;UI.at=pAt;UI.walk=pW;kb._k=null;applyUpgrades();return R}
+try{EXTRA_TESTS.push(runTestsH)}catch(e){setTimeout(()=>EXTRA_TESTS.push(runTestsH),0)}
 init();
 </script>
 </body>
