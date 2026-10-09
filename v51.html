@@ -500,6 +500,7 @@ const STR={vi:{
  ne_power:'Cúp điện một lúc: máy tắt, khách ngồi chờ và bực. Mua Máy phát điện để không lo.',ne_net:'Đứt cáp quang: mạng lag cả ngày, khách kém vui và về sớm hơn.',
  ns_rain:'Trời mưa · khách +30%',ns_power:'Hôm nay sẽ cúp điện',ns_net:'Đứt cáp quang · mạng lag',ev_power_on:'Cúp điện!',ev_power_off:'Có điện lại',
  upg_generator:'Máy phát điện',upgd_generator:'Cúp điện thì máy phát tự chạy: khách vẫn chơi bình thường.',
+  music:'Nhạc nền',
  migrated:'Đã chuyển save sang phiên bản mới.',save_bad:'Save không đọc được nên đã được sao lưu riêng, bắt đầu game mới.',
  top_trung:'trứng',top_xucxich:'xúc xích',top_cavien:'cá viên',top_rau:'rau',
  bin_mi:'Mì tôm',bin_mi_bo:'Mì bò',bin_mi_ga:'Mì gà',bin_mi_cay:'Mì cay',bin_cavien:'Cá viên',bin_bovien:'Bò viên',bin_tomvien:'Tôm viên',bin_xucxich:'Xúc xích',bin_holo:'Hồ lô',
@@ -539,6 +540,41 @@ const fx={
   d.style.left=x+'px';d.style.top=y+'px';d.style.color=col||'#303030';L.appendChild(d);setTimeout(()=>d.remove(),1250)},
  sfx(n){if(!TEST)SFX.play(n)},
  err(k,v){if(TEST)return;this.toast(t(k,v),'bad');this.sfx('error')}};
+ /* ---------- Nhạc nền: tự sáng tác, phát bằng Web Audio (không file, không bản quyền) ---------- */
+function musicWanted(){return!!S&&S.settings.music!==false&&!document.hidden&&!powerOut()&&S.phase!=='REPORT'}
+const MUSIC={ctx:null,bus:null,out:null,noiseBuf:null,rain:null,step:0,nextT:0,want:false,tg:-1,md:null,
+ SONG:{day:{bpm:84,ch:[[53,57,60,64],[52,55,59,62],[50,53,57,60],[48,52,55,59]],bs:[41,40,38,36],
+   mel:[[76,0,74,72,0,69,72,0],[71,0,72,74,0,76,0,0],[74,0,72,69,0,67,69,0],[67,0,69,72,0,0,0,0]]},
+  night:{bpm:68,ch:[[57,60,64,67],[53,57,60,64],[50,53,57,60],[52,55,59,62]],bs:[45,41,38,40],
+   mel:[[76,0,0,72,0,69,0,0],[72,0,0,0,69,0,67,0],[69,0,72,0,0,74,0,0],[71,0,0,67,0,0,0,0]]}},
+ hz:m=>440*2**((m-69)/12),
+ mode(){return S&&S.time>=1200?'night':'day'},
+ unlock(){if(TEST)return;try{if(!this.ctx){const C=this.ctx=new(window.AudioContext||window.webkitAudioContext)();
+   this.out=C.createGain();this.out.gain.value=0;this.out.connect(C.destination);
+   const lp=C.createBiquadFilter();lp.type='lowpass';lp.frequency.value=2200;lp.connect(this.out);this.bus=lp;
+   const b=this.noiseBuf=C.createBuffer(1,C.sampleRate,C.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+   this.nextT=C.currentTime+.1;setInterval(()=>this.sched(),50)}
+  if(this.ctx.state==='suspended')this.ctx.resume()}catch(e){}},
+ update(){if(!this.ctx)return;const want=!TEST&&musicWanted(),tg=want?(S.paused?.12:.3):0;
+  if(tg!==this.tg){this.tg=tg;this.out.gain.setTargetAtTime(tg,this.ctx.currentTime,.4)}this.want=want;const rw=want&&evOn('rain');
+  if(rw&&!this.rain){const C=this.ctx,s=C.createBufferSource(),f=C.createBiquadFilter(),g=C.createGain();s.buffer=this.noiseBuf;s.loop=true;f.type='lowpass';f.frequency.value=1400;g.gain.value=.05;s.connect(f).connect(g).connect(this.out);s.start();this.rain=s}
+  else if(!rw&&this.rain){try{this.rain.stop()}catch(e){}this.rain=null}},
+ tone(m,t,d,type,vol){const C=this.ctx,o=C.createOscillator(),g=C.createGain();o.type=type;o.frequency.value=this.hz(m);
+  g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(vol,t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g).connect(this.bus);o.start(t);o.stop(t+d+.05)},
+ hit(t,d,vol,hp){const C=this.ctx,s=C.createBufferSource(),f=C.createBiquadFilter(),g=C.createGain();s.buffer=this.noiseBuf;f.type='highpass';f.frequency.value=hp;
+  g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);s.connect(f).connect(g).connect(this.bus);s.start(t);s.stop(t+d+.02)},
+ kick(t,vol){const C=this.ctx,o=C.createOscillator(),g=C.createGain();o.frequency.setValueAtTime(110,t);o.frequency.exponentialRampToValueAtTime(42,t+.15);
+  g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.0001,t+.3);o.connect(g).connect(this.bus);o.start(t);o.stop(t+.35)},
+ sched(){const C=this.ctx;if(!C)return;if(!this.want){this.nextT=C.currentTime+.1;return}
+  while(this.nextT<C.currentTime+.25){const s=this.step%32;if(s===0||!this.md)this.md=this.mode();
+   const night=this.md==='night',sg=this.SONG[this.md],sd=60/sg.bpm/2,bar=s>>3,pos=s&7,t=this.nextT+(pos&1?sd*.12:0);
+   if(pos===0){sg.ch[bar].forEach(m=>this.tone(m,t,sd*4,'triangle',.05));this.tone(sg.bs[bar],t,sd*3,'sine',.16);this.kick(t,.32)}
+   if(pos===3&&!night)sg.ch[bar].forEach(m=>this.tone(m,t,sd*2,'triangle',.03));
+   if(pos===4){this.tone(sg.bs[bar]+(night?0:7),t,sd*3,'sine',.12);if(!night)this.kick(t,.24)}
+   if(pos===2||pos===6)this.hit(t,.12,night?.04:.07,1800);
+   if(!night&&!(pos&1))this.hit(t,.04,.025,7000);
+   const mel=sg.mel[bar][pos];if(mel)this.tone(mel,t,sd*1.6,'sine',night?.06:.07);
+   this.nextT+=sd;this.step++}}};
 function say(c,text,d){c.say={text,until:S.time+(d||18)}}
 
 /* ---------- state mới ---------- */
@@ -551,7 +587,7 @@ function newState(){
   inv:Object.fromEntries(ITEMS.map(i=>[i.id,i.start])),lots:{},prices:{},upg:{},staff:null,
   k:emptyKitchen(),hand:null,sel:{},carry:[],pickup:Array(CFG.PICKUP_N).fill(null),
   customers:[],accounts:{},tx:[],history:[],seq:{c:0,tx:0,order:1000,dish:0},
-  player:{x:CFG.COUNTER_SPOT.x,y:CFG.COUNTER_SPOT.y,flip:false},today:null,report:null,settings:{sound:true,hints:true},tutorialDone:false,seen:{},event:null,lastEvent:null};
+  player:{x:CFG.COUNTER_SPOT.x,y:CFG.COUNTER_SPOT.y,flip:false},today:null,report:null,ettings:{sound:true,hints:true,music:true},tutorialDone:false,seen:{},event:null,lastEvent:null};
  s.today=freshToday(s.money);return s}
 const carryMax=()=>S&&S.upg&&S.upg.tray_big?6:CFG.CARRY_MAX;
 const hasPickup=()=>!!(S&&S.upg&&S.upg.pickup);
@@ -1577,7 +1613,7 @@ const BUILD={
   const g=grp=>UPGRADES.filter(x=>x.grp===grp).map(x=>{const own=u[x.id],lock=x.req==='cook'&&!cook&&!own;
    return`<div class="scard ${own?'on':''}"><div class="grow"><b>${t('upg_'+x.id)}</b><p class="muted" style="margin:4px 0">${t('upgd_'+x.id)}</p>${own?`<span class="badge ok">${t('upg_owned')}</span>`:lock?`<span class="badge warn">🔒 ${t('upg_need_cook')}</span>`:`<button class="sm pri" data-ui="upg" data-a="${x.id}">${t('upg_buy')} · ${vk(x.price)}</button>`}</div></div>`}).join('');
   return`<h3>${t('upg_t')} <span class="muted">· ${vnd(S.money)}</span></h3><h4>${t('upg_kitchen')}</h4>${g('kitchen')}<h4>${t('upg_room')}</h4>${g('room')}`},
- set(){return`<h3>${t('nav_set')}</h3>${rowKV(t('sound'),`<button class="sm" data-ui="sound">${S.settings.sound?t('on'):t('off')}</button>`)}${rowKV(t('hints'),`<button class="sm" data-ui="hints">${S.settings.hints!==false?t('on'):t('off')}</button>`)}${rowKV(t('language'),'Tiếng Việt')}
+ set(){return`<h3>${t('nav_set')}</h3>${rowKV(t('sound'),`<button class="sm" data-ui="sound">${S.settings.sound?t('on'):t('off')}</button>`)}${rowKV(t('hints'),`<button class="sm" data-ui="hints">${S.settings.hints!==false?t('on'):t('off')}</button>`)}${rowKV(t('music'),`<button class="sm" data-ui="music">${S.settings.music!==false?t('on'):t('off')}</button>`)}${rowKV(t('language'),'Tiếng Việt')}
   <div class="btns col"><button data-ui="save">${t('save_now')}</button><button class="ok" data-ui="test">${t('run_test')}</button><button class="danger" data-ui="reset">${t('reset')}</button></div><p class="muted">${t('save_note')}</p><p class="muted center">${t('build_lbl',{v:CFG.BUILD})}</p>`},
  tests(){const R=UI.testRes||[],p=R.filter(x=>x.pass).length;
   return`<h3>${t('test_t')}</h3><p class="${p===R.length?'okc':'badc'}"><b>${t('test_sum',{p,n:R.length})}</b></p>${R.map(x=>`<div class="trow"><span>${x.pass?'✅':'❌'}</span><div>${esc(x.n)}${x.info?`<small class="muted">${esc(x.info)}</small>`:''}</div></div>`).join('')}<button class="wide" data-ui="close">${t('close')}</button>`},
@@ -1605,7 +1641,7 @@ const ACT={
  open:()=>{if(openShop()){closeSheet();saveGame()}},
  next:()=>{if(nextDay()){UI.prepShown=false;UI.lastRc=null;closeSheet(true);saveGame()}},
  inv:()=>openSheet('inv'),go:a=>openSheet(a),viewCust:a=>openSheet('cust',+a),openPc:a=>openSheet('pc',+a),start:()=>openSheet('prep'),
- sound:()=>{S.settings.sound=!S.settings.sound;renderSheet()},
+ sound:()=>{S.settings.sound=!S.settings.sound;renderSheet()},music:()=>{S.settings.music=S.settings.music===false;MUSIC.unlock();renderSheet()},
  hints:()=>{S.settings.hints=S.settings.hints===false;UI.hlK=null;renderSheet()},
  save:()=>{saveGame();fx.toast(t('toast_saved'),'ok')},
  test:()=>{UI.testRes=runTests();applyUpgrades();refreshMatch();renderMeta(0,true);openSheet('tests')},
@@ -1622,7 +1658,7 @@ function frame(now){
  const dt=Math.min(.1,(now-last)/1000||0);last=now;applyUpgrades();
  if(!S.paused&&(S.phase==='OPEN'||S.phase==='CLOSING')){let m=dt*CFG.MIN_PER_SEC;while(m>1e-6){const d=Math.min(1,m);stepSim(d);m-=d}}
  if(!S.paused)movePlayer(dt);
- refreshMatch();renderTop();renderMeta(now);renderPCs();renderKitchen();renderHL(now);renderCustomers();renderPlayer();renderStaff();renderCarry();renderKBar();
+ refreshMatch();MUSIC.update();renderTop();renderMeta(now);renderPCs();renderKitchen();renderHL(now);renderCustomers();renderPlayer();renderStaff();renderCarry();renderKBar();
  if(UI.sheet&&!UI.ptr&&now-UI.refreshT>1000){UI.refreshT=now;if(['counter','cust','pc','pcs','orders'].includes(UI.sheet.kind))renderSheet()}
  if(S.phase==='REPORT'&&(!UI.sheet||UI.sheet.kind!=='report'))openSheet('report');
  if(S.phase==='PREP'&&!UI.sheet&&!UI.prepShown){UI.prepShown=true;openSheet('prep')}
@@ -1654,7 +1690,7 @@ function bind(){
  $('kbar').addEventListener('click',onKBar);
  document.addEventListener('click',e=>{if(!S||!UI.at)return;if($('kbar').contains(e.target))return;
   if(e.target.closest&&e.target.closest('[data-act="kst"],[data-act="spot"],[data-act="bin"]'))return;UI.at=null},true);
- $('bPause').addEventListener('click',()=>{S.paused=!S.paused});
+ document.addEventListener('pointerdown',()=>MUSIC.unlock(),true);$('bPause').addEventListener('click',()=>{S.paused=!S.paused});
  $('bStatus').addEventListener('click',()=>{if(S.phase==='PREP')ACT.open();else if(S.phase==='REPORT')openSheet('report')});
  $('bar').addEventListener('click',e=>{const b=e.target.closest('[data-nav]');if(b&&S.phase!=='REPORT')openSheet(b.dataset.nav)});
  document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;
@@ -2090,6 +2126,16 @@ function runTests(){
   ok('EV11. Lần đầu gặp sự kiện → trang "Sự kiện mới" + chip ở dự báo',ep.includes('evbig')&&ep.includes('evchip'));
   openShop();S.phase='PREP';const ep2=BUILD.prep();
   ok('EV12. Lần sau chỉ còn chip biểu tượng, không giới thiệu lại',!ep2.includes('evbig')&&ep2.includes('evchip'));
+    /* ---- MU. Nhạc nền ---- */
+  ok('MU1. Không dùng file nhạc ngoài (tự tạo bằng code)',!document.querySelector('audio')&&!Object.keys(SOUND_FILES).length);
+  ok('MU2. Có bản ngày và bản đêm (đêm chậm hơn), mỗi bản 4 hợp âm lặp vòng',MUSIC.SONG.day.ch.length===4&&MUSIC.SONG.night.ch.length===4&&MUSIC.SONG.night.bpm<MUSIC.SONG.day.bpm);
+  S=newState();S.time=1210;const mn=MUSIC.mode();S.time=600;
+  ok('MU3. Từ 20h chuyển sang bản đêm',mn==='night'&&MUSIC.mode()==='day');
+  ok('MU4. Cài đặt có nút Bật/Tắt nhạc nền',BUILD.set().includes('data-ui="music"'));
+  fresh(5);S.event={k:'power',start:S.time,dur:20};const mp=musicWanted();S.upg.generator=true;
+  ok('MU5. Cúp điện → nhạc tắt; có máy phát → vẫn phát',!mp&&musicWanted());
+  S.settings.music=false;
+  ok('MU6. Tắt trong Cài đặt → không phát',!musicWanted());
   /* ---- BOT. Bot chơi trọn ngày ---- */
   const bt=simulateDay({});
   ok('BOT1. Bot tự nấu + giao trọn 1 ngày → kết thúc ngày',bt.done,bt.info);
