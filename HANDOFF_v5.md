@@ -288,3 +288,17 @@ Quầy ra món ẩn trên bản đồ cho tới khi mua.
 - Khi "thay cả dòng": **bôi đen hết dòng** rồi dán. Dán đè lên một phần sẽ để lại đuôi dòng cũ → lỗi cú pháp, trang trắng.
 - Code có dấu backtick luôn để trong khung code riêng, không để lẫn trong câu chữ.
 - Trang trắng chưa có chữ trên thanh trên = lỗi cú pháp. Xem dòng đỏ đầu tiên trong Console.
+
+## v5.1d — Sự kiện ngẫu nhiên
+- Mở **ngày 5** (`EVENT_DAY`). Tối đa 1 sự kiện/ngày, quyết định lúc `nextDay()` → `rollEvent()`. Không lặp lại sự kiện hôm qua (`S.lastEvent`).
+- `S.event={k}` (cúp điện thêm `start, dur, told`). `evOn(k)` = sự kiện đang diễn ra · `powerOut()` = cúp điện và chưa có máy phát.
+
+| Sự kiện | Xác suất | Ảnh hưởng | Hình |
+|---|---|---|---|
+| 🌧️ `rain` | 25% | Khách +30% (`maybeSpawn`, `forecast`), kiên nhẫn hàng chờ ×1,3 | Mưa rơi ở cửa (`.raining .rain`) |
+| ⚡ `power` | 15% | 15–25 phút, 10h–20h. Khách không bị trừ tiền/giờ, vui vẻ −2/phút, <15 và không chờ món thì bỏ về. Bếp vẫn chạy | Khu máy tối (`.blackout`), khách 😠, thông báo bật/tắt (`eventTick`) |
+| 📶 `net` | 10% | Cả ngày: vui vẻ −0,3/phút, giờ chơi ×0,8, 📶 hiện dày hơn | Biểu tượng 📶 |
+
+- Nâng cấp mới **Máy phát điện 2tr** (`generator`, nhóm phòng máy): cúp điện không ảnh hưởng.
+- Lần đầu gặp → trang "🆕 Sự kiện mới" trong khung lật trang (`S.seen['ev_'+k]`). Mọi ngày có sự kiện → chip `.evchip` phía trên dự báo. Báo cáo cuối ngày hiện biểu tượng sự kiện.
+- Test nhóm **EV** (12 bài). Tổng **194**.
