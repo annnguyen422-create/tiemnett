@@ -2273,6 +2273,48 @@ function runTestsH(){
  }catch(err){ok('Lỗi test H: '+err.message,false)}
  S=saved;TEST=false;NOSPAWN=false;UI.at=pAt;UI.walk=pW;kb._k=null;applyUpgrades();return R}
 try{EXTRA_TESTS.push(runTestsH)}catch(e){setTimeout(()=>EXTRA_TESTS.push(runTestsH),0)}
+ /* ================= PATCH H2 — "TIẾP THEO" LÀ TAG; CHỈ BẤM ĐƯỢC KHI LÀM MÓN MỚI LẦN ĐẦU ================= */
+(function(){const st=document.createElement('style');st.textContent=`
+#kbar .knext .tg{display:inline-block!important;max-width:100%;min-height:0!important;padding:4px 12px!important;font-size:13px!important;line-height:1.4;cursor:default!important}
+#kbar .knext .tg.btn{cursor:pointer!important;padding:8px 14px!important;border-width:2.5px;background:#D4F0DC}`;document.head.appendChild(st)})();
+/* Việc tiếp theo: chưa có Quầy ra món thì bỏ gợi ý "đặt lên quầy", tìm việc kế tiếp */
+function nextActionTag(){const m=refreshMatch();let act=nextAction(m);
+ const pk=typeof hasPickup==='function'?hasPickup():true;
+ if(act&&act.msg===t('nx_park')&&!pk){const keep=S.carry;S.carry=keep.filter(d=>m.byObj.get(d));
+  try{act=nextAction(refreshMatch())}finally{S.carry=keep;refreshMatch()}
+  if(act&&act.msg===t('nx_park'))act=null}
+ return act}
+syncNext=function(){const kb=$('kbar');if(!kb||!S)return;
+ let row=kb.querySelector('.knext');
+ const live=(S.phase==='OPEN'||S.phase==='CLOSING')&&UI.at&&!UI.walk&&S.settings.hints!==false;
+ const act=live?nextActionTag():null;
+ if(!act||!act.msg){if(row)row.remove();return}
+ const teach=typeof teachActive==='function'&&teachActive();
+ const to=teach?(act.cust?'cust:'+act.cust:act.st?'st:'+act.st:''):'';
+ const key=act.msg+'|'+to;
+ if(row&&row._k===key&&row===kb.lastElementChild)return;
+ if(!row){row=document.createElement('div');row.className='knext'}
+ row._k=key;row.innerHTML=to?`<span class="tg btn" data-nx="${to}" role="button">${t('nx_prefix')} <b>${esc(act.msg)}</b> ➜</span>`:`<span class="tg">${t('nx_prefix')} <b>${esc(act.msg)}</b></span>`;
+ kb.appendChild(row)};
+const _setH2=BUILD.set;BUILD.set=function(){return _setH2().replace(/Bản: v4-[^<]*/,'Bản: v4-H2')};
+function runTestsH2(){
+ const R=[],ok=(n,c,i)=>R.push({n,pass:!!c,info:i||''}),saved=S,pAt=UI.at,pW=UI.walk,kb=$('kbar');TEST=true;NOSPAWN=true;
+ const row=st=>{UI.at=st;UI.walk=null;kb._k=null;renderKBar();syncNext();return kb.querySelector('.knext')};
+ try{
+  S=newState();S.day=5;applyUpgrades();openShop();
+  S.carry=[newDish('cola')];const r1=row('fridge');
+  ok('H5. Chưa có Quầy ra món, món chưa có khách → không hiện "đặt lên Quầy ra món"',!r1||!r1.textContent.includes(t('st_pickup')));
+  S.carry=[];kBin('freezer','cavien');const r2=row('freezer');
+  ok('H6. Ngày thường → "Tiếp theo" chỉ là tag, không bấm được',!!r2&&!r2.querySelector('[data-nx]')&&r2.textContent.includes(t('nx_fryer')));
+  S=newState();S.day=2;applyUpgrades();openShop();
+  const c=spawnCustomer({type:'sinhvien'});c.state='WAITING_FOOD';c.pcId=1;c.order={id:1,items:[{r:'cavien',top:[],done:false}],t:0};
+  kBin('freezer','cavien');const r3=row('freezer');
+  ok('H7. Ngày ra món mới, làm lần đầu → tag thành nút bấm được',!!r3&&!!r3.querySelector('[data-nx="st:fryer"]'));
+  S.today.sold.cavien=1;const r4=row('freezer');
+  ok('H8. Đã bán món mới 1 lần → trở lại tag thường',!!r4&&!r4.querySelector('[data-nx]'));
+ }catch(err){ok('Lỗi test H2: '+err.message,false)}
+ S=saved;TEST=false;NOSPAWN=false;UI.at=pAt;UI.walk=pW;kb._k=null;applyUpgrades();return R}
+try{EXTRA_TESTS.push(runTestsH2)}catch(e){setTimeout(()=>EXTRA_TESTS.push(runTestsH2),0)}
 init();
 </script>
 </body>
