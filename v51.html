@@ -327,8 +327,7 @@ const KIT={
  fryer:{x:550,y:38,w:100,h:100,name:'st_fryer',spots:[[6,16],[50,16]]},
  bar:{x:656,y:38,w:170,h:100,name:'st_bar',spots:[[14,6],[64,6]],bins:[['ly',3,62,22,30],['da',26,62,22,30],['tra',49,62,22,30],['caphe',72,62,22,30],['chanh',95,62,22,30],['dao',118,62,22,30],['sua',141,62,22,30]]},
  fridge:{x:832,y:30,w:70,h:110,name:'st_fridge',bins:[['energy',8,28,26,36],['cola',36,28,26,36],['water',8,66,26,36],['soda',36,66,26,36]]},
-  trash:{x:908,y:94,w:32,h:46,name:'st_trash'},  snack:{x:12,y:340,w:88,h:96,name:'st_snack',spot:{x:56,y:454},bins:[['bimbim',5,26,24,30],['huongduong',32,26,24,30],['banhngot',59,26,24,30]]}};
-const CABINETS=['noodlebox','freezer','fridge'];
+ trash:{x:908,y:94,w:32,h:46,name:'st_trash'},snack:{x:16,y:38,w:76,h:100,name:'st_snack',bins:[['bimbim',4,22,22,30],['huongduong',27,22,22,30],['banhngot',50,22,22,30]]}};const CABINETS=['noodlebox','freezer','fridge'];
   const GRAB={fridge:1,snack:1}; /* trạm "bấm là lấy" giống Tủ lạnh */
 const AMB={win:'🎉',lose:'😤',lag:'📶',hot:'🥵',sleepy:'💤'}; /* phản ứng của khách đang chơi */
 const ambKeys=()=>Object.keys(AMB).filter(k=>k!=='hot'||!(S&&S.upg.aircon));
@@ -1102,10 +1101,7 @@ const benchSVG=()=>`<svg viewBox="0 0 110 36" width="110" height="36" aria-hidde
 const plantSVG=()=>`<svg viewBox="0 0 40 52" width="40" height="52" aria-hidden="true"><circle cx="13" cy="18" r="9" fill="#58B368" ${OL}/><circle cx="27" cy="16" r="9" fill="#5CC8A1" ${OL}/><circle cx="20" cy="8" r="8" fill="#58B368" ${OL}/><path d="M9 30 H31 L28 50 H12 Z" fill="#FF7A59" ${OL}/></svg>`;
 const boardSVG=()=>`<svg viewBox="0 0 70 26" width="70" height="26" aria-hidden="true"><rect x="1" y="1" width="68" height="24" rx="3" fill="#2f4a3a" stroke="#8a6440" stroke-width="2"/><path d="M8 8 h22 M8 13 h16 M8 18 h20" stroke="#f4f4f4" stroke-width="1.5" stroke-linecap="round" opacity=".8"/><path d="M40 12 h20 a10 8 0 0 1 -20 0z" fill="#fff" opacity=".85"/><path d="M45 9 q2-3 0-6 M51 9 q2-3 0-6" stroke="#fff" stroke-width="1" fill="none"/></svg>`;
 const fanSVG=()=>`<svg viewBox="0 0 50 50" width="50" height="50" aria-hidden="true"><g opacity=".7"><ellipse cx="25" cy="10" rx="5" ry="10" fill="#8a6440"/><ellipse cx="25" cy="40" rx="5" ry="10" fill="#8a6440"/><ellipse cx="10" cy="25" rx="10" ry="5" fill="#8a6440"/><ellipse cx="40" cy="25" rx="10" ry="5" fill="#8a6440"/><circle cx="25" cy="25" r="5" fill="#303030"/></g></svg>`;
-function motoG(ox,col){return`<circle cx="${ox+10}" cy="36" r="6" fill="#303030"/><circle cx="${ox+40}" cy="36" r="6" fill="#303030"/><path d="M${ox+6} 31 Q${ox+12} 18 ${ox+26} 20 L${ox+38} 20 L${ox+46} 31 Z" fill="${col}" ${S2}/><rect x="${ox+16}" y="14" width="14" height="5" rx="2" fill="#303030"/><path d="M${ox+40} 20 l4 -10" stroke="#303030" stroke-width="2"/>`}
-const decorHTML=()=>`<div class="ent fan" style="left:440px;top:318px;z-index:900">${fanSVG()}</div><div class="ent fan" style="left:700px;top:318px;z-index:900">${fanSVG()}</div>
- <div class="ent" style="left:178px;top:546px;z-index:590;pointer-events:none"><svg viewBox="0 0 110 44" width="110" height="44" aria-hidden="true">${motoG(2,'#E85D5D')}${motoG(56,'#5B9DEF')}</svg></div>
- <div class="ent" style="left:120px;top:578px;z-index:590;pointer-events:none"><svg viewBox="0 0 40 16" width="40" height="16" aria-hidden="true"><ellipse cx="8" cy="8" rx="5" ry="7" fill="#E85D5D" stroke="#303030"/><ellipse cx="19" cy="8" rx="5" ry="7" fill="#E85D5D" stroke="#303030"/><ellipse cx="32" cy="9" rx="5" ry="6" fill="#5B9DEF" stroke="#303030"/></svg></div>`;
+const decorHTML=()=>`<div class="ent fan" style="left:440px;top:318px;z-index:900">${fanSVG()}</div><div class="ent fan" style="left:700px;top:318px;z-index:900">${fanSVG()}</div>`;
  const signSVG=()=>`<svg viewBox="0 0 200 24" width="200" height="24" aria-hidden="true"><rect x="2" y="2" width="196" height="20" rx="4" fill="#1d1d2b" stroke="#E85D5D" stroke-width="2"/><g class="led">${[...Array(12)].map((_,i)=>`<circle cx="${10+i*16}" cy="5" r="1.4" fill="#FFB84D"/>`).join('')}</g>${txt(100,18,'INTERNET · GAME',12,'#5CE1E6')}</svg>`;/* ---------- món ăn ở từng giai đoạn ---------- */
 const NOODLE_COL={mi:'#F2B84B',mi_bo:'#C0603A',mi_ga:'#E9C46A',mi_cay:'#E85D5D'},BROTH={mi:'#F0B860',mi_bo:'#C9773F',mi_ga:'#EFCB6A',mi_cay:'#E2553B'};
 const FRY_COL={cavien:'#F4E3C1',bovien:'#C9A58A',tomvien:'#F6C9B8',xucxich:'#E9A08C',holo:'#EBD3A8'},COOK_COL={under:'#EBC27A',perfect:'#DB9A4E',over:'#9E5B2A',ruined:'#3a2a20'};
@@ -1187,8 +1183,8 @@ const KSVG={
  bar:`<svg viewBox="0 0 170 100" width="170" height="100" aria-hidden="true"><rect x="2" y="2" width="166" height="94" rx="8" fill="#ECE6DC" ${OL}/><rect x="2" y="58" width="166" height="38" rx="8" fill="#5CC8A1" ${OL}/><rect x="120" y="8" width="42" height="44" rx="6" fill="#fff" ${OL}/><rect x="126" y="16" width="12" height="12" rx="2" fill="#E6F6FB" stroke="#8cc"/><rect x="142" y="22" width="12" height="12" rx="2" fill="#E6F6FB" stroke="#8cc"/>${txt(141,48,'PHA CHẾ',7)}</svg>`,
  fridge:`<svg viewBox="0 0 70 110" width="70" height="110" aria-hidden="true"><rect x="3" y="3" width="64" height="104" rx="8" fill="#F4F7FB" ${OL}/><rect x="3" y="3" width="64" height="20" rx="8" fill="#5B9DEF" ${OL}/>${txt(35,17,'NƯỚC',8,'#fff')}<rect x="6" y="26" width="58" height="78" rx="4" fill="#CFE8F7" ${OL}/></svg>`,
  trash:`<svg viewBox="0 0 32 46" width="32" height="46" aria-hidden="true"><rect x="5" y="10" width="22" height="34" rx="4" fill="#5f6b77" ${OL}/><rect x="3" y="5" width="26" height="7" rx="3" fill="#7d8a97" ${OL}/><path d="M12 18 v20 M16 18 v20 M20 18 v20" stroke="#303030" stroke-width="1" opacity=".5"/></svg>`,
-  snack:`<svg viewBox="0 0 88 96" width="88" height="96" aria-hidden="true"><rect x="3" y="4" width="82" height="88" rx="7" fill="#C99A6B" ${OL}/><rect x="3" y="4" width="82" height="16" rx="7" fill="#FF7A59" ${OL}/><rect x="7" y="60" width="74" height="4" fill="#8a6440"/><rect x="10" y="68" width="16" height="18" rx="3" fill="#F2B84B" ${S2}/><rect x="36" y="70" width="16" height="16" rx="3" fill="#7a4b2a" ${S2}/><rect x="62" y="72" width="16" height="14" rx="5" fill="#E9A85A" ${S2}/></svg>`,
-  pickup:`<svg viewBox="0 0 56 324" width="56" height="324" aria-hidden="true"><rect x="2" y="2" width="52" height="320" rx="8" fill="#C99A6B" ${OL}/><rect x="2" y="2" width="52" height="24" rx="8" fill="#58B368" ${OL}/>${txt(28,12,'QUẦY',8,'#fff')}${txt(28,22,'RA MÓN',8,'#fff')}</svg>`};
+ snack:`<svg viewBox="0 0 76 100" width="76" height="100" aria-hidden="true"><rect x="3" y="4" width="70" height="92" rx="7" fill="#C99A6B" ${OL}/><rect x="3" y="4" width="70" height="14" rx="7" fill="#FF7A59" ${OL}/><rect x="7" y="58" width="62" height="4" fill="#8a6440"/><rect x="10" y="66" width="14" height="20" rx="3" fill="#F2B84B" ${S2}/><rect x="31" y="68" width="14" height="18" rx="3" fill="#7a4b2a" ${S2}/><rect x="52" y="70" width="14" height="16" rx="5" fill="#E9A85A" ${S2}/></svg>`,
+ pickup:`<svg viewBox="0 0 56 324" width="56" height="324" aria-hidden="true"><rect x="2" y="2" width="52" height="320" rx="8" fill="#C99A6B" ${OL}/><rect x="2" y="2" width="52" height="24" rx="8" fill="#58B368" ${OL}/>${txt(28,12,'QUẦY',8,'#fff')}${txt(28,22,'RA MÓN',8,'#fff')}</svg>`};
 
 /* ================= 6. WORLD ================= */
 const PCEL={};
@@ -1200,7 +1196,6 @@ function buildWorld(){
  <div class="ent qlane" style="left:112px;top:328px;width:56px;height:196px"></div><div class="ent qlane" style="left:168px;top:470px;width:112px;height:54px"></div>
  <div class="zone" style="left:92px;top:322px">🧍 XẾP HÀNG</div>
  <div class="ent" style="left:380px;top:3px;z-index:2">${signSVG()}</div><div class="ent" data-act="menuboard" role="button" tabindex="0" aria-label="${t('nav_food')}" style="left:604px;top:2px;z-index:3">${boardSVG()}</div>${decorHTML()}`;
- h+=`<div class="ent" data-act="storage" tabindex="0" role="button" aria-label="${t('st_storage')}" style="left:16px;top:38px;width:76px;height:100px;z-index:138">${KSVG.storage}<div class="lbl">${t('st_storage')}</div></div>`;
  for(const st in KIT){const K=KIT[st];
   h+=`<div class="ent" data-act="kst" data-id="${st}" tabindex="0" role="button" aria-label="${t(K.name)}" style="left:${K.x}px;top:${K.y}px;width:${K.w}px;height:${K.h}px;z-index:${K.y+K.h}">${KSVG[st]}<div class="lbl">${t(K.name)}</div>`;
   (K.spots||[]).forEach((p,i)=>{h+=`<div class="ks empty" id="ks-${st}-${i}" data-act="spot" data-id="${st}:${i}" role="button" aria-label="${t(K.name)} ${i+1}" style="left:${p[0]}px;top:${p[1]}px"></div>`});
@@ -1989,6 +1984,7 @@ function runTests(){
   S.upg.aircon=true;const zk=ambKeys();S.upg.aircon=false;
   ok('Z5. Có máy lạnh → không còn than nóng 🥵',!zk.includes('hot')&&ambKeys().includes('hot'));
   ok('Z6. Chữ giá trên tường đã thay bằng bảng đen (bấm mở Đồ ăn)',!$('wallmenu')&&!!document.querySelector('[data-act="menuboard"]'));
+    ok('Z7. Kệ snack nằm ở hàng bếp (chỗ Kho cũ), bản đồ không còn ô Kho',!stEl('storage')&&KIT.snack.y<CFG.KIT_Y&&!KIT.snack.spot);
   /* ---- BOT. Bot chơi trọn ngày ---- */
   const bt=simulateDay({});
   ok('BOT1. Bot tự nấu + giao trọn 1 ngày → kết thúc ngày',bt.done,bt.info);
