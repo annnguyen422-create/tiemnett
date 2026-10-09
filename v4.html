@@ -2217,6 +2217,12 @@ function runTestsF(){
  }catch(err){ok('Lỗi test F: '+err.message,false)}
  S=saved;TEST=false;NOSPAWN=false;UI.at=pAt;UI.walk=pW;kb._k=null;applyUpgrades();return R}
 try{EXTRA_TESTS.push(runTestsF)}catch(e){setTimeout(()=>EXTRA_TESTS.push(runTestsF),0)}
+ /* ================= PATCH G — MÀU NÚT "−" / BADGE, GỌN TỦ TRÊN BẢN ĐỒ ================= */
+(function(){const st=document.createElement('style');st.textContent=`
+#kbar .cnt.qty{background:var(--blue)!important;color:#fff}
+#kbar .kbs button .minus{background:var(--bad)!important;color:#fff!important}
+#world .kbn .bq{display:none!important}
+#world .kbn.selq{outline:none!important;background:rgba(255,255,255,.75)!important}`;document.head.appendChild(st)})();
 init();
 </script>
 </body>
