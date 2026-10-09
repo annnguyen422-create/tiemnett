@@ -1528,7 +1528,305 @@ function init(){
  if(fresh){UI.prepShown=true;openSheet('welcome')}
  if(/[?&]test\b/.test(location.search)){UI.testRes=runTests();applyUpgrades();refreshMatch();openSheet('tests')}
  requestAnimationFrame(n=>{last=n;frame(n)})}
-/* ================= PATCH B — SỬA LỖI LOGIC ================= */
+/* ================= 9. SELF TEST ================= */
+function checkInv(errs){const push=m=>{if(errs.length<10&&!errs.includes(m))errs.push(m)};
+ for(const pc of S.pcs)if(pc.status!=='AVAILABLE'){const c=custById(pc.currentCustomer);if(!c||c.pcId!==pc.id)push('PC #'+pc.id+' giữ sai khách')}
+ const used=S.customers.filter(c=>c.pcId).map(c=>c.pcId);if(new Set(used).size!==used.length)push('Hai khách cùng một máy');
+ for(const k in S.inv)if(S.inv[k]<0)push('Kho âm: '+k);
+ if(S.carry.length>carryMax())push('Khay quá số món');if(S.pickup.length!==CFG.PICKUP_N)push('Sai số ô quầy ra món');
+ if(!Number.isInteger(S.money))push('Tiền bị lẻ');
+ const qp=queueList().filter(c=>c.state!=='TO_QUEUE').map(c=>Math.round(c.x)+','+Math.round(c.y));if(new Set(qp).size!==qp.length)push('Khách đứng chồng trong hàng');
+ for(const d of S.carry.concat(S.pickup.filter(Boolean)))if(!MENU_BY[d.r])push('Món lạ: '+d.r)}
+function botAct(){ /* bot làm bếp như người chơi: mỗi lần 1 thao tác */
+ const h=S.hand,mine=w=>w&&!isCookItem(w),free=st=>S.k[st].indexOf(null),ok=r=>!!(r&&r.ok);
+ if(h){if(h.k==='trash')return ok(kTrash());
+  if(h.k==='bowl'){const f=free('stove');return f>=0&&ok(kTap('stove',f))}
+  if(h.k==='raw'&&h.cat==='noodle'){const f=free('board');return f>=0&&ok(kTap('board',f))}
+  if(h.k==='raw'){const f=free('fryer');return f>=0&&ok(kTap('fryer',f))}
+  if(h.k==='fried'){const f=free('board');return f>=0&&ok(kTap('board',f))}
+  return ok(kTrash())}
+ const room=S.carry.length<carryMax()||S.pickup.includes(null);
+ for(let i=0;i<S.k.stove.length;i++){const w=S.k.stove[i];if(!mine(w))continue;const cs=cookState(w.t,COOK.noodle);if(cs==='ruined'||(cs!=='under'&&room))return ok(kTap('stove',i))}
+ for(let i=0;i<S.k.fryer.length;i++){const w=S.k.fryer[i];if(!mine(w))continue;const cs=cookState(w.t,COOK.fried);if(cs==='ruined'||(cs!=='under'&&free('board')>=0))return ok(kTap('fryer',i))}
+ const m=refreshMatch();
+ for(let i=0;i<S.k.bar.length;i++){const w=S.k.bar[i];if(!mine(w))continue;
+  if(w.st==='done'){if(room)return ok(kTap('bar',i));continue}
+  if(w.st==='open'){const o=m.byObj.get(w),r=o?o.it.r:(w.want&&w.want.r),mx=MIX[r];S.sel.bar=i;
+   if(!mx){S.k.bar[i]=null;return true}
+   if(!w.ice)return ok(kBin('bar','da'));if(!w.base)return ok(kBin('bar',mx.base));if(!w.flavor)return ok(kBin('bar',mx.flavor))}}
+ for(let i=0;i<S.k.board.length;i++){const w=S.k.board[i];if(!mine(w))continue;S.sel.board=i;const o=m.byObj.get(w);
+  if(w.cat==='noodle'){const need=o?(o.it.top||[]).filter(x=>!w.top.includes(x)&&(S.inv[x]||0)>0):[];
+   if(need.length)return ok(kBin('board',need[0]));if(w.done&&free('stove')>=0)return ok(kTap('board',i))}
+  else if(w.done&&room)return ok(kTap('board',i))}
+ const o=m.orders.find(x=>!x.u&&hasStockFor(x.it.r));if(!o)return false;const R=MENU_BY[o.it.r];
+ if(R.type==='bottle')return room&&ok(kBin('fridge',R.id));
+ if(R.type==='noodle')return free('board')>=0&&ok(kBin('noodlebox',R.base));
+ if(R.type==='fried')return free('fryer')>=0&&ok(kBin('freezer',R.base));
+ if(R.type==='mix'){const f=free('bar');if(f<0)return false;const r=placeCup(f);if(r.ok)S.k.bar[f].want={r:R.id,top:[]};return ok(r)}
+ return false}
+function botTick(deliverOnly){
+ const cash=c=>Math.floor(cashFree(c)/10000)*10000,f=queueFront();
+ if(f&&f.state==='QUEUE'){const fr=S.pcs.filter(p=>p.status==='AVAILABLE');if(fr.length){const pc=fr.find(p=>p.tier===f.preferredPC)||fr[0];
+  if(f.balance<pc.hourlyRate/4){const a=Math.min(Math.max(f.askAmt,10000),cash(f));if(a>0)recharge(f,a)}assignPC(f,pc)}}
+ for(const c of S.customers)if(isSeated(c)&&(c.rechargeReq||c.state==='RECHARGE')){const a=Math.min(c.rechargeReq||10000,cash(c));if(a>0)recharge(c,a)}
+ const dl=()=>{const m=refreshMatch();S.carry=S.carry.filter(d=>m.byObj.get(d));S.pickup=S.pickup.map(d=>d&&m.byObj.get(d)?d:null);
+  for(const c of S.customers.slice())if(isSeated(c)&&c.order){collectFor(c);deliverTo(c)}};
+ dl();if(!deliverOnly){for(let g=0;g<12;g++)if(!botAct())break;dl()}
+ for(const it of ITEMS)if(S.inv[it.id]<it.min)buyStock(it.id,it.pack*2)}
+function simulateDay(o){
+ S=newState();S.money=S.today.startMoney=20000000;applyUpgrades();if(o.cook)hireStaff('cook');NOSPAWN=false;openShop();const errs=[];let g=0;
+ while(S.phase!=='REPORT'&&g++<4000){botTick(!!o.deliverOnly);stepSim(1);checkInv(errs)}
+ NOSPAWN=true;const sum=S.tx.reduce((a,x)=>a+x.amount,0),r=S.report||{},dishes=r.sold?Object.values(r.sold).reduce((a,b)=>a+b,0):0;
+ return{done:S.phase==='REPORT',errs,ledger:S.money===S.today.startMoney+sum,reportOk:!!S.report&&r.profit===r.revenue-r.expense,
+  food:r.rev?r.rev.food:0,drink:r.rev?r.rev.drink:0,
+  info:S.report?`Khách ${r.visitors} · ngồi máy ${r.served} · ${dishes} món · hủy ${r.failed} · bỏ về ${r.left} · LN ${vnd(r.profit)}`:'Không kết thúc được ngày'}}
+function runTests(){
+ const R=[],ok=(n,c,info)=>R.push({n,pass:!!c,info:info||''});
+ const saved=S,sv=SERVING,sm=MATCH;TEST=true;NOSPAWN=true;SERVING=null;
+ const until=(fn,max)=>{for(let i=0;i<(max||600)&&!fn();i++)stepSim(1);return!!fn()};
+ const okr=r=>!!(r&&r.ok);
+ const fresh=()=>{S=newState();S.money=S.today.startMoney=20000000;applyUpgrades();openShop();S.time=18*60;refreshMatch()};
+ const seat=type=>{const c=spawnCustomer({type:type||'sinhvien'});c.money=500000;c.gamingTime=99999;c.balance=200000;
+  until(()=>c.state==='QUEUE',30);assignPC(c,S.pcs.find(p=>p.status==='AVAILABLE'));until(()=>c.state==='PLAYING',40);
+  c.hunger=0;c.thirst=0;c.lastOrderT=S.time;return c};
+ const giveOrder=(c,items)=>{c.order={id:++S.seq.order,items:items.map(([r,top])=>({r,top:top||[],done:false})),t:S.time};c.state='WAITING_FOOD';c.orderPatienceMax=c.orderPatience=2000;refreshMatch()};
+ try{
+  /* ---- 1. Hàng chờ ở quầy ---- */
+  fresh();
+  const q1=spawnCustomer({type:'hocsinh'}),q2=spawnCustomer({type:'hocsinh'}),q3=spawnCustomer({type:'hocsinh'});
+  ok('Q1. Khách mới vào → đang tới quầy',[q1,q2,q3].every(c=>c.state==='TO_QUEUE'));
+  ok('Q2. Tới nơi → xếp hàng, ai đến trước đứng đầu',until(()=>[q1,q2,q3].every(c=>c.state==='QUEUE'),40)&&queueFront()===q1);
+  ok('Q3. Mỗi người một chỗ, không đứng chồng',new Set([q1,q2,q3].map(c=>c.x+','+c.y)).size===3&&q1.x===QUEUE_SPOTS[0].x&&q1.y===QUEUE_SPOTS[0].y&&q2.y===QUEUE_SPOTS[1].y);
+  q1.balance=50000;
+  ok('Q4. Phục vụ người đầu hàng → đi tới máy',okr(assignPC(q1,S.pcs[4]))&&q1.state==='TO_PC');
+  ok('Q5. Hàng tự tiến lên',until(()=>q2.x===QUEUE_SPOTS[0].x&&q2.y===QUEUE_SPOTS[0].y,20)&&queueFront()===q2);
+  SERVING=q2.id;q2.state='SERVING';const pq=q2.patience;stepSim(5);
+  ok('Q6. Đang được phục vụ thì không mất kiên nhẫn',q2.patience===pq&&q2.state==='SERVING');
+  SERVING=null;stepSim(1);
+  ok('Q7. Đóng bảng quầy → khách quay lại hàng',q2.state==='QUEUE');
+  for(let i=0;i<4;i++)spawnCustomer({type:'hocsinh'});
+  const lb=S.today.left,qx=spawnCustomer({type:'hocsinh'});
+  ok('Q8. Hàng đầy (6 người) → khách mới về luôn',queueList().length===6&&qx.state==='LEAVING'&&S.today.left===lb+1);
+  q3.patience=.5;stepSim(1);
+  ok('Q9. Chờ quá lâu → bực bội rồi bỏ về',q3.state==='LEAVING');
+  /* ---- 2. Kiên nhẫn ---- */
+  const T=CT.sinhvien,pt=r=>orderPatienceFor([{r,top:[]}],T);
+  ok('K1. Thời gian chờ theo loại món: nước chai < pha chế < đồ chiên < mì',pt('cola')<pt('tra_chanh')&&pt('tra_chanh')<pt('cavien')&&pt('cavien')<pt('mi_bo'),`${pt('cola')} / ${pt('tra_chanh')} / ${pt('cavien')} / ${pt('mi_bo')} phút game`);
+  ok('K2. Gọi nhiều món → chờ được lâu hơn',orderPatienceFor([{r:'mi_bo',top:[]},{r:'cola',top:[]}],T)>pt('mi_bo'));
+  fresh();const pa=seat();giveOrder(pa,[['cola']]);pa.orderPatienceMax=pa.orderPatience=100;stepSim(10);
+  ok('K3. Đang chơi chờ món → kiên nhẫn giảm chậm (×0,7)',Math.abs((100-pa.orderPatience)-7)<.01,`giảm ${(100-pa.orderPatience).toFixed(1)} / 10 phút`);
+  pa.orderPatience=100;S.carry.push(newDish('cola',[],100));refreshMatch();stepSim(10);
+  ok('K4. Món xong mà chưa giao → kiên nhẫn giảm nhanh (×1,6)',Math.abs((100-pa.orderPatience)-16)<.01&&orderReady(pa),`giảm ${(100-pa.orderPatience).toFixed(1)} / 10 phút`);
+  ok('K5. Có 4 mức tâm trạng',moodKey(.9)==='happy'&&moodKey(.5)==='waiting'&&moodKey(.3)==='impatient'&&moodKey(.1)==='angry');
+  S.carry=[];pa.orderPatience=.3;stepSim(1);
+  ok('K6. Hết kiên nhẫn lần 1 → hủy đơn, vẫn ngồi chơi',!pa.order&&isSeated(pa)&&pa.fails===1);
+  giveOrder(pa,[['cola']]);pa.orderPatience=.3;stepSim(1);
+  ok('K7. Hủy đơn lần 2 → khách bỏ về',pa.state==='LEAVING');
+  /* ---- 3. Luồng nấu mì ---- */
+  fresh();const c=seat();giveOrder(c,[['mi_bo',['trung']]]);const i0={...S.inv};let a=nextAction(refreshMatch());
+  ok('M1. Chưa làm gì → gợi ý Thùng mì, đúng loại mì',!!a&&a.st==='noodlebox'&&a.bins.includes('noodlebox:mi_bo'));
+  ok('M2. Lấy gói Mì bò → trừ kho, đang cầm',okr(kBin('noodlebox','mi_bo'))&&S.hand.k==='raw'&&S.inv.mi_bo===i0.mi_bo-1);
+  ok('M3. Đang cầm gói mì → gợi ý Bàn sơ chế',nextAction(refreshMatch()).st==='board');
+  ok('M4. Không bắc gói mì sống lên bếp được',!kTap('stove',0).ok&&!!S.hand);
+  ok('M5. Đặt lên Bàn sơ chế → tự sơ chế, trừ 1 tô, món gắn đúng khách',okr(kTap('board',0))&&!S.hand&&S.k.board[0].k==='prep'&&S.inv.to===i0.to-1&&refreshMatch().byObj.get(S.k.board[0]).c===c);
+  ok('M6. Đang sơ chế → chưa bưng được',kTap('board',0).err==='err_not_ready');
+  a=nextAction(refreshMatch());
+  ok('M7. Gợi ý đúng topping khách gọi (trứng)',a.st==='board'&&a.bins.includes('board:trung'));
+  ok('M8. Thêm trứng',okr(kBin('board','trung'))&&S.k.board[0].top.includes('trung')&&S.inv.trung===i0.trung-1);
+  ok('M9. Sơ chế tự xong (~3 phút game)',until(()=>S.k.board[0].done,5));
+  ok('M10. Bưng tô → gợi ý chuyển sang Bếp',okr(kTap('board',0))&&S.hand.k==='bowl'&&nextAction(refreshMatch()).st==='stove');
+  ok('M11. Bắc lên bếp',okr(kTap('stove',0))&&!S.hand&&S.k.stove[0].k==='pot');
+  ok('M12. Vừa chín → gợi ý vớt',until(()=>cookState(S.k.stove[0].t,COOK.noodle)==='perfect',10)&&nextAction(refreshMatch()).st==='stove');
+  ok('M13. Vớt → lên khay, chất lượng 100, khách có món sẵn sàng',okr(kTap('stove',0))&&S.carry.length===1&&S.carry[0].r==='mi_bo'&&S.carry[0].q===100&&orderReady(c));
+  ok('M14. Gợi ý giao đúng khách',nextAction(refreshMatch()).cust===c.id);
+  const mb=S.money,d1=deliverTo(c);
+  ok('M15. Giao món → thu đúng tiền (có topping), đơn xong',d1.n===1&&S.money===mb+19000&&!c.order&&c.state==='EATING');
+  ok('M16. Không thu tiền hai lần',deliverTo(c).n===0&&S.money===mb+19000);
+  /* ---- 4. Đồ chiên ---- */
+  giveOrder(c,[['cavien']]);
+  ok('F1. Lấy cá viên → gợi ý Chảo chiên',okr(kBin('freezer','cavien'))&&nextAction(refreshMatch()).st==='fryer');
+  ok('F2. Thả vào chảo',okr(kTap('fryer',0))&&!S.hand);
+  ok('F3. Vàng giòn thì vớt → gợi ý Bàn sơ chế',until(()=>cookState(S.k.fryer[0].t,COOK.fried)==='perfect',10)&&okr(kTap('fryer',0))&&S.hand.k==='fried'&&nextAction(refreshMatch()).st==='board');
+  const di=S.inv.dia,tu=S.inv.tuong;
+  ok('F4. Đặt lên bàn → tự bày đĩa + rưới tương',okr(kTap('board',1))&&S.inv.dia===di-1&&S.inv.tuong===tu-1);
+  ok('F5. Xong → lên khay',until(()=>S.k.board[1].done,5)&&okr(kTap('board',1))&&S.carry.some(d=>d.r==='cavien'&&d.q===100));
+  ok('F6. Để quá lâu → cháy → gợi ý Thùng rác',okr(kBin('freezer','bovien'))&&okr(kTap('fryer',1))&&until(()=>cookState(S.k.fryer[1].t,COOK.fried)==='ruined',30)&&okr(kTap('fryer',1))&&S.hand.k==='trash'&&nextAction(refreshMatch()).st==='trash'&&okr(kTrash()));
+  deliverTo(c);
+  /* ---- 5. Pha chế + nước chai ---- */
+  giveOrder(c,[['tra_dao']]);
+  ok('D1. Gợi ý bắt đầu ở Quầy pha nước',nextAction(refreshMatch()).st==='bar');
+  ok('D2. Lấy ly → gợi ý thêm đá',okr(kBin('bar','ly'))&&nextAction(refreshMatch()).bins.includes('bar:da'));
+  ok('D3. Đá → gợi ý trà → gợi ý đào',okr(kBin('bar','da'))&&nextAction(refreshMatch()).bins.includes('bar:tra')&&okr(kBin('bar','tra'))&&nextAction(refreshMatch()).bins.includes('bar:dao'));
+  ok('D4. Đủ trà + đào → tự lắc',okr(kBin('bar','dao'))&&S.k.bar[0].st==='shaking'&&kTap('bar',0).err==='err_shaking');
+  ok('D5. Lắc xong → bấm ly → Trà đào lên khay',until(()=>S.k.bar[0].st==='done',5)&&okr(kTap('bar',0))&&S.carry.some(d=>d.r==='tra_dao'&&d.q===100));
+  ok('D6. Pha sai (trà + sữa) → hỏng',okr(kBin('bar','ly'))&&okr(kBin('bar','tra'))&&okr(kBin('bar','sua'))&&until(()=>S.k.bar[0].st==='done',5)&&okr(kTap('bar',0))&&S.hand.k==='trash'&&okr(kTrash()));
+  ok('D7. Nước chai: Tủ lạnh → khay',okr(kBin('fridge','cola'))&&S.carry.some(d=>d.r==='cola'));
+  deliverTo(c);
+  /* ---- 6. Quầy ra món ---- */
+  ok('G1. Món chưa ai nhận → đặt lên Quầy ra món',okr(kTap('pickup',0))&&!!S.pickup[0]&&S.pickup[0].r==='cola'&&!refreshMatch().byObj.get(S.pickup[0]));
+  giveOrder(c,[['cola']]);
+  ok('G2. Khách gọi đúng món đang ở quầy → món tự gắn khách đó',refreshMatch().byObj.get(S.pickup[0]).c===c&&orderReady(c)&&itemStatus(c,0)==='os_pickup');
+  ok('G3. Lấy món ở quầy cho đúng khách → giao',collectFor(c)===1&&!S.pickup[0]&&deliverTo(c).n===1&&!c.order);
+  /* ---- 7. Trường hợp đặc biệt ---- */
+  fresh();const e1=seat(),e2=seat();giveOrder(e1,[['mi_ga']]);S.carry.push(newDish('mi_ga',[],100));giveOrder(e2,[['mi_ga']]);
+  ok('E1. Hai khách cùng gọi một món → dành cho người gọi trước',refreshMatch().byObj.get(S.carry[0]).c===e1);
+  checkout(e1);
+  ok('E2. Khách về trước khi nhận → món tự chuyển cho khách khác cùng món',refreshMatch().byObj.get(S.carry[0]).c===e2&&custSpot(e1)===null);
+  const e3=seat();giveOrder(e3,[['cola']]);
+  ok('E3. Không giao nhầm: khách không gọi món đó thì không nhận',deliverTo(e3).n===0&&S.carry.length===1);
+  S.carry.push(newDish('cola',[],100));const mm=refreshMatch();
+  ok('E4. Nhiều món sẵn sàng cùng lúc → mỗi món gắn đúng một khách',mm.byObj.get(S.carry[0]).c===e2&&mm.byObj.get(S.carry[1]).c===e3);
+  ok('E5. Giao lần lượt đúng người',deliverTo(e2).n===1&&deliverTo(e3).n===1&&S.carry.length===0);
+  const mv=spawnCustomer({type:'hocsinh'}),s1=custSpot(mv);stepSim(1);const s2=custSpot(mv);
+  ok('E6. Khách đang di chuyển → điểm giao cập nhật theo',s1.x!==s2.x||s1.y!==s2.y);
+  giveOrder(e2,[['mi_cay',['rau']],['water']]);kBin('noodlebox','mi_cay');kTap('board',0);S.pickup[2]=newDish('water',[],100);refreshMatch();
+  const bk=deserialize(serialize());
+  ok('E7. Lưu/tải giữ nguyên đơn, món đang sơ chế, quầy ra món',JSON.stringify(bk.customers.find(x=>x.id===e2.id).order)===JSON.stringify(e2.order)&&JSON.stringify(bk.k)===JSON.stringify(S.k)&&JSON.stringify(bk.pickup)===JSON.stringify(S.pickup));
+  /* ---- 8. Nhân viên ---- */
+  fresh();
+  ok('S1. Thuê đầu bếp → chỉ được 1 người',okr(hireStaff('cook'))&&hireStaff('cashier').err==='err_staff_one');
+  const sc=seat();giveOrder(sc,[['mi_cay',['trung']],['cavien'],['tra_dao'],['water']]);
+  const cooked=until(()=>['mi_cay','cavien','tra_dao','water'].every(r=>S.pickup.some(d=>d&&d.r===r)),150);
+  ok('S2. Đầu bếp tự làm đủ 4 món, đặt lên Quầy ra món',cooked&&S.pickup.some(d=>d&&d.r==='mi_cay'&&d.top.includes('trung')),S.pickup.filter(Boolean).map(d=>d.r).join(', '));
+  ok('S3. Người chơi không phải nấu: tay và khay vẫn trống',!S.hand&&!S.carry.length);
+  ok('S4. Người chơi chỉ lấy món và giao',collectFor(sc)===4&&deliverTo(sc).n===4&&!sc.order);
+  giveOrder(sc,[['mi_tom']]);until(()=>S.k.board.some(isCookItem),10);const ci=S.k.board.findIndex(isCookItem);
+  ok('S5. Món đầu bếp đang làm → người chơi không đụng vào được',ci>=0&&kTap('board',ci).err==='err_cook_item');
+  ok('S6. Cho đầu bếp nghỉ',okr(fireStaff())&&!S.staff);
+  ok('S7. Thuê thu ngân',okr(hireStaff('cashier')));
+  const k1=spawnCustomer({type:'gamethu'}),k2=spawnCustomer({type:'gamethu'});k1.money=k2.money=300000;
+  ok('S8. Thu ngân phục vụ người đầu hàng trước',until(()=>k1.state==='SERVING'||k1.state==='TO_PC',30)&&inQueue(k2));
+  ok('S9. Lần lượt xếp máy cho cả hàng',until(()=>isSeated(k1)&&isSeated(k2),60)&&k1.balance>0&&k2.balance>0);
+  /* ---- 9. Tiền, kho, giá, nâng cấp, cuối ngày ---- */
+  fresh();const ec=spawnCustomer({type:'sinhvien'});ec.money=500000;until(()=>ec.state==='QUEUE',30);const m0=S.money;
+  ok('T1. Nạp 50.000đ → tiền tiệm và số dư khách tăng',okr(recharge(ec,50000))&&S.money===m0+50000&&ec.balance===50000);
+  ok('T2. Không nạp vượt tiền mặt',!recharge(ec,10000000).ok);
+  const tp=S.pcs.find(p=>p.tier==='thuong');
+  ok('T3. Xếp máy → RESERVED → ngồi vào OCCUPIED',okr(assignPC(ec,tp))&&tp.status==='RESERVED'&&until(()=>ec.state==='PLAYING',40)&&tp.status==='OCCUPIED');
+  ec.gamingTime=99999;ec.hunger=ec.thirst=0;const b0=ec.balance;stepSim(10);
+  ok('T4. Trừ số dư đúng giá giờ',Math.abs((b0-ec.balance)-tp.hourlyRate/6)<1);
+  ec.balance=tp.hourlyRate/60*5;ec.rechargeReq=0;ec.reqCooldown=0;
+  ok('T5. Sắp hết tiền → xin nạp; hết hẳn → dừng chờ nạp',until(()=>ec.rechargeReq>0,30)&&until(()=>ec.state==='RECHARGE',30));
+  ok('T6. Nạp khi đang chơi → chơi tiếp',okr(recharge(ec,50000))&&ec.state==='PLAYING');
+  ec.played=ec.gamingTime;stepSim(1);
+  ok('T7. Hết giờ → về, máy trống, lưu số dư khách quen',ec.state==='LEAVING'&&tp.status==='AVAILABLE'&&!!S.accounts[ec.name]);
+  S.inv.cavien=0;const rs=kBin('freezer','cavien');S.inv.cavien=5;
+  ok('T8. Hết hàng → báo lỗi thân thiện',rs.err==='err_stock');
+  const sm2=S.money;S.money=1000;const rb=buyStock('mi',10);S.money=sm2;
+  ok('T9. Không đủ tiền → không nhập được hàng',rb.err==='err_money');
+  const bi=S.inv.mi,bm=S.money;ok('T10. Nhập hàng → kho tăng, tiền giảm',okr(buyStock('mi',10))&&S.inv.mi===bi+10&&S.money===bm-40000);
+  S.inv.cavien=10;S.lots={cavien:[{n:4,exp:S.day},{n:6,exp:S.day+3}]};const tk=takeStock('cavien');
+  ok('H1. Hạn dùng: lô cũ dùng trước (FIFO)',!!tk&&tk.exp===S.day&&S.inv.cavien===9);returnStock('cavien',tk.exp);
+  ok('H2. Cầm Mì bò bấm Mì gà → đổi; bấm lại → trả về kho',okr(kBin('noodlebox','mi_bo'))&&okr(kBin('noodlebox','mi_ga'))&&S.hand.b==='mi_ga'&&okr(kBin('noodlebox','mi_ga'))&&!S.hand);
+  ok('P1. Đổi giá trong giới hạn 50–200%',okr(setPrice('mi_bo',18000))&&priceOf('mi_bo')===18000&&!setPrice('mi_bo',1000).ok&&okr(setPrice('mi_bo',14000)));
+  ok('U1. Chảo tự ngắt: để 30 phút vẫn không cháy',okr(buyUpgrade('fryer_auto'))&&okr(kBin('freezer','cavien'))&&okr(kTap('fryer',0))&&(until(()=>false,30),cookState(S.k.fryer[0].t,COOK.fried)==='perfect'));
+  ok('U2. Khay lớn: bưng được 6 món',okr(buyUpgrade('tray_big'))&&carryMax()===6);
+  ok('U3. Màn hình 144Hz: giá giờ +2.000đ',okr(buyUpgrade('monitor'))&&S.pcs.every(p=>p.hourlyRate===PC_TIERS[p.tier].rate+2000));
+  S.k=emptyKitchen();S.time=CFG.CLOSE-1;until(()=>S.phase==='REPORT',300);const rp=S.report;
+  ok('R1. Báo cáo cuối ngày đúng công thức',!!rp&&rp.profit===rp.revenue-rp.expense&&rp.revenue===rp.rev.recharge+rp.rev.food+rp.rev.drink&&rp.exp.upgrade>0);
+  ok('R2. Sổ sách khớp từng đồng',S.money===S.today.startMoney+S.tx.reduce((s,x)=>s+x.amount,0));
+  ok('R3. Mỗi giao dịch đủ trường, không trùng ID',S.tx.every(x=>x.transactionId&&x.type&&typeof x.amount==='number'&&x.timestamp&&x.description)&&new Set(S.tx.map(x=>x.transactionId)).size===S.tx.length);
+  ok('R4. Cuối ngày dọn sạch bếp, tay, khay, quầy ra món',!S.hand&&!S.carry.length&&S.pickup.every(x=>!x)&&Object.values(S.k).every(arr=>arr.every(x=>!x)));
+  syncLots('cavien');const exN=S.lots.cavien.filter(l=>l.exp<S.day+1).reduce((s,l)=>s+l.n,0),cb=S.inv.cavien;
+  ok('R5. Sang ngày mới → tự bỏ hàng hết hạn',nextDay()&&S.day===2&&S.inv.cavien===cb-exN&&exN>0,`bỏ ${exN}, còn ${S.inv.cavien}`);
+  /* ---- 10. Lưu / tải / chuyển save cũ ---- */
+  const vc=spawnCustomer({type:'hocsinh'});vc.state='WAITING';vc.order={id:7,items:[{r:'mi_bo',top:['trung'],done:false}],t:0};
+  const snap=serialize(),b2=deserialize(snap);
+  ok('V1. Lưu → tải lại khôi phục đủ',b2.money===S.money&&b2.day===S.day&&JSON.stringify(b2.inv)===JSON.stringify(S.inv)&&JSON.stringify(b2.upg)===JSON.stringify(S.upg)&&JSON.stringify(b2.lots)===JSON.stringify(S.lots));
+  const o2=JSON.parse(snap);o2.v=2;o2.tray=[{r:'mi_bo',top:['trung'],q:100},{r:'cola',top:[],q:100}];delete o2.carry;delete o2.pickup;
+  o2.k={board:[{k:'bowl',b:'mi',st:'open',top:[]},null,null],stove:[null,null],fryer:[null,null],bar:[null,null]};o2.settings={sound:true,coach:false};
+  let m2=null;try{m2=deserialize(JSON.stringify(o2))}catch(e){}
+  ok('V2. Save v2 (bản trước) → tự chuyển sang v3',!!m2&&m2.v===3&&m2.carry.length===2&&m2.carry[0].id>0&&m2.pickup.length===CFG.PICKUP_N&&m2.k.board.every(x=>!x)&&m2.settings.hints===false);
+  ok('V3. Khách đang chờ ở save cũ → vào hàng chờ mới',!!m2&&m2.customers.some(x=>x.state==='QUEUE'&&x.order&&x.order.items[0].r==='mi_bo'));
+  const o1=JSON.parse(JSON.stringify(o2));o1.v=1;o1.tray=['mi_xx','cola'];o1.inv={mi:5,trachanh:7};o1.today.sold={mi_trung:2};
+  const oc=o1.customers.find(x=>x.state==='WAITING');oc.order.items=[{r:'mi_trung',done:false}];oc.state='ENTER';
+  let m1=null;try{m1=deserialize(JSON.stringify(o1))}catch(e){}
+  ok('V4. Save v1 (bản đầu tiên) → v2 → v3',!!m1&&m1.v===3&&m1.inv.tra===7&&m1.carry[0].r==='mi_tom'&&m1.carry[0].top.includes('xucxich')&&m1.customers.some(x=>x.state==='TO_QUEUE'&&x.order.items[0].top.includes('trung')));
+  let threw=false;try{deserialize('{"v":99}')}catch(e){threw=true}
+  ok('V5. Save phiên bản lạ → báo lỗi để sao lưu, không ghi đè',threw);
+  let ls=false;try{localStorage.setItem('tiemnet_selftest',snap);ls=localStorage.getItem('tiemnet_selftest')===snap;localStorage.removeItem('tiemnet_selftest')}catch(e){}
+  ok('V6. localStorage ghi/đọc được',ls);
+  /* ---- 11. Bot chơi trọn ngày ---- */
+  const bt=simulateDay({});
+  ok('B1. Bot tự nấu + giao trọn 1 ngày → kết thúc ngày',bt.done,bt.info);
+  ok('B2. Bot: không lỗi trạng thái (máy, kho, khay, hàng chờ)',!bt.errs.length,bt.errs.slice(0,3).join('; '));
+  ok('B3. Bot: sổ sách khớp, báo cáo đúng',bt.ledger&&bt.reportOk);
+  ok('B4. Bot: bán được đồ ăn và nước',bt.food>0&&bt.drink>0,`đồ ăn ${vnd(bt.food)} · nước ${vnd(bt.drink)}`);
+  const bc=simulateDay({cook:true,deliverOnly:true});
+  ok('B5. Có đầu bếp: người chơi CHỈ giao món vẫn bán đủ đồ ăn và nước',bc.done&&bc.food>0&&bc.drink>0&&!bc.errs.length,bc.info);
+ }catch(e){ok('Lỗi khi chạy test: '+e.message,false,String(e.stack||'').split('\n')[1]||'')}
+ S=saved;SERVING=sv;MATCH=sm;TEST=false;NOSPAWN=false;ACTOR='player';
+ try{console.table(R)}catch(e){}
+ return R}
+/* ================= PATCH A — GỌN GIAO DIỆN ================= */
+Object.assign(STR.vi,{sts_prep:'▶ Mở cửa',sts_open:'🟢 Mở',sts_closing:'🟠 Sắp đóng',sts_report:'🔴 Đóng',err_paused:'Đang tạm dừng — bấm ▶ để chơi tiếp.'});
+(function(){
+ const st=document.createElement('style');
+ st.textContent=`
+#top{flex-wrap:nowrap;gap:5px;padding:6px 8px;overflow:hidden}
+#top .chip{font-size:13px;padding:4px 8px;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#bStatus{flex:none;font-size:12px;min-height:32px;padding:2px 10px;white-space:nowrap}
+#speeds{margin-left:auto;flex:none}
+#speeds button{min-width:42px;font-size:15px}
+#hint{display:none}
+.kbt{display:none}
+#toasts{top:60px}
+@media(min-width:700px){#top .chip{font-size:14px;padding:5px 10px}#bStatus{font-size:13px}}`;
+ document.head.appendChild(st);
+ document.querySelectorAll('#speeds [data-sp]').forEach(b=>{if(b.dataset.sp!=='0')b.remove()});
+ const cp=$('cPeople');if(cp)cp.remove();
+})();
+/* Thanh trên: 1 hàng — ngày/giờ · tiền · đánh giá · trạng thái · tạm dừng. Không còn tốc độ 2x/4x. */
+function renderTop(){
+ S.speed=1;const narrow=window.innerWidth<600;
+ setT($('cDay'),`${PERIOD_ICON[period(S.time)]} ${narrow?'N'+S.day:t('day',{d:S.day})} · ${hhmm(Math.floor(S.time))}`);
+ setT($('cMoney'),'💰 '+(narrow?vk(S.money):vnd(S.money)));
+ setT($('cRate'),'⭐ '+S.rating.toFixed(1));
+ const b=$('bStatus'),k={PREP:'prep',OPEN:'open',CLOSING:'closing',REPORT:'report'}[S.phase],lbl=t((narrow?'sts_':'st_')+k);
+ if(b._k!==k+lbl){b._k=k+lbl;b.className=k;b.textContent=lbl}
+ const pb=document.querySelector('#speeds [data-sp="0"]');
+ if(pb){const s=S.paused?'▶':'⏸';if(pb._s!==s){pb._s=s;pb.textContent=s;pb.classList.toggle('on',S.paused);pb.setAttribute('aria-label',S.paused?'Chơi tiếp':'Tạm dừng')}}}
+/* Khách đang xếp hàng: không hiện bóng chat (chỉ còn số thứ tự + thanh kiên nhẫn) */
+function bubbleOf(c){
+ if(inQueue(c))return null;
+ const mo=moodOf(c),mi=mo?`<span class="md">${MOOD_ICON[moodKey(mo.f)]}</span> `:'',mk=mo?moodKey(mo.f):'';
+ if(c.state==='LEAVING')return c.say?{k:'s'+c.say.text,html:esc(c.say.text)}:null;
+ if(c.order){const st=c.order.items.map((it,i)=>it.done?'':itemStatus(c,i));
+  const k='o'+c.order.items.map((it,i)=>it.r+(it.top||[]).join('')+st[i]).join(',')+mk;
+  const html=mi+c.order.items.map((it,i)=>{if(it.done)return'';const s=st[i],cls=s==='os_carry'||s==='os_pickup'?'rd':s==='os_todo'?'':'wip';
+   return`<span class="oi ${cls}">${wiSVG({k:'dish',r:it.r,top:it.top},22)}</span>`}).join('');
+  return{k,cls:'order',html}}
+ if(c.state==='RECHARGE'||c.rechargeReq)return{k:'r'+c.rechargeReq+mk,cls:'money',html:mi+'💰 '+esc(c.joke?t('b_more'):t('b_recharge',{amt:vk(c.rechargeReq||10000)}))};
+ if(c.say)return{k:'s'+c.say.text,html:esc(c.say.text)};
+ if(c.state==='EATING')return{k:'eat',html:'😋'};return null}
+/* Bộ test bổ sung theo từng patch */
+function runTestsA(){
+ const R=[],ok=(n,c,i)=>R.push({n,pass:!!c,info:i||''}),saved=S,sv=SERVING;TEST=true;NOSPAWN=true;SERVING=null;
+ const until=(fn,max)=>{for(let i=0;i<(max||600)&&!fn();i++)stepSim(1);return!!fn()};
+ try{
+  S=newState();openShop();S.time=18*60;
+  const c=spawnCustomer({type:'hocsinh'});
+  ok('A1. Khách đang đi tới quầy: không có bóng chat',c.state==='TO_QUEUE'&&bubbleOf(c)===null);
+  ok('A2. Khách đứng trong hàng: không có bóng chat',until(()=>c.state==='QUEUE',40)&&bubbleOf(c)===null);
+  ok('A3. Vẫn còn thanh kiên nhẫn khi xếp hàng',!!moodOf(c));
+  c.balance=50000;assignPC(c,S.pcs[4]);until(()=>c.state==='PLAYING',40);c.gamingTime=9999;maybeOrder(c,true);
+  ok('A4. Khách đã ngồi máy gọi món: vẫn hiện bóng món',(bubbleOf(c)||{}).cls==='order');
+  S.speed=4;renderTop();
+  ok('A5. Không còn tốc độ nhanh: game luôn chạy 1x',S.speed===1);
+ }catch(e){ok('Lỗi test A: '+e.message,false)}
+ S=saved;SERVING=sv;TEST=false;NOSPAWN=false;return R}
+const EXTRA_TESTS=[runTestsA];
+function runAllTests(){let R=runTests();for(const f of EXTRA_TESTS)R=R.concat(f());applyUpgrades();refreshMatch();return R}
+ACT.test=()=>{UI.testRes=runAllTests();openSheet('tests')};
+function init(){
+ S=loadGame();const fresh=!S;if(!S)S=newState();
+ bind();buildWorld();fit();requestAnimationFrame(fit);applyUpgrades();refreshMatch();
+ if(UI.migrated)setTimeout(()=>fx.toast(t('migrated'),'ok'),400);
+ if(UI.saveBad)setTimeout(()=>fx.toast(t('save_bad'),'bad'),400);
+ if(fresh){UI.prepShown=true;openSheet('welcome')}
+ if(/[?&]test\b/.test(location.search)){UI.testRes=runAllTests();openSheet('tests')}
+ requestAnimationFrame(n=>{last=n;frame(n)})}
+ /* ================= PATCH B — SỬA LỖI LOGIC ================= */
 Object.assign(STR.vi,{err_wrong_top:'Món trên khay không đúng topping. Khách gọi: {item}.'});
 Object.assign(DIALOGUE.vi,{wrong_top:['Không đúng món em gọi anh ơi.','Em gọi khác topping mà anh...']});
 const budgetOf=it=>PAT.budget[MENU_BY[it.r].type]||30;
