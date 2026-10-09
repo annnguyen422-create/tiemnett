@@ -2177,6 +2177,44 @@ function runTestsE2(){
  }catch(err){ok('Lỗi test E2: '+err.message,false)}
  S=saved;TEST=false;NOSPAWN=false;applyUpgrades();document.querySelectorAll('.kbn').forEach(e=>{e._q=null});return R}
 try{EXTRA_TESTS.push(runTestsE2)}catch(e){setTimeout(()=>EXTRA_TESTS.push(runTestsE2),0)}
+ /* ================= PATCH F — NÚT "−" TRẢ CHAI VỀ TỦ LẠNH ================= */
+Object.assign(STR.vi,{err_nothing_return:'Chưa lấy chai này.',kb_return_one:'Trả 1 chai về tủ'});
+(function(){const st=document.createElement('style');st.textContent=`
+.kbw .mini.minus{left:-8px;right:auto;background:#fff;color:var(--dark);font-size:17px;font-weight:900;line-height:1}
+.kbw .mini.minus::before{content:'';position:absolute;inset:-9px}`;document.head.appendChild(st)})();
+/* Trả 1 chai: ưu tiên chai chưa có khách nhận */
+function returnBottle(id){
+ const idx=S.carry.map((d,i)=>d.r===id?i:-1).filter(i=>i>=0);if(!idx.length)return KE('err_nothing_return');
+ const m=refreshMatch();let k=idx.find(i=>!m.byObj.get(S.carry[i]));if(k==null)k=idx[idx.length-1];
+ S.carry.splice(k,1);returnStock(id,null);refreshMatch();return KO('RETURN')}
+/* Gắn nút "−" vào thẻ nước đã lấy (sau mỗi lần bàn thao tác vẽ lại) */
+function decorateFridge(){const kb=$('kbar');if(!kb||!S||UI.at!=='fridge')return;
+ kb.querySelectorAll('button[data-kb^="bin:fridge:"]').forEach(b=>{const id=b.dataset.kb.split(':')[2];
+  if(!S.carry.some(d=>d.r===id)||b.parentNode.classList.contains('kbw'))return;
+  const w=document.createElement('div');w.className='kbw';b.parentNode.insertBefore(w,b);w.appendChild(b);
+  const m=document.createElement('button');m.className='mini minus';m.dataset.kb='ret:fridge:'+id;m.setAttribute('aria-label',t('kb_return_one'));m.textContent='−';w.appendChild(m)})}
+(function(){const kb=$('kbar');if(!kb)return;
+ new MutationObserver(decorateFridge).observe(kb,{childList:true});
+ kb.addEventListener('click',e=>{const b=e.target.closest('[data-kb^="ret:"]');if(!b)return;e.stopPropagation();
+  if(S.paused){fx.err('err_paused');return}uiK(returnBottle(b.dataset.kb.split(':')[2]))})})();
+function runTestsF(){
+ const R=[],ok=(n,c,i)=>R.push({n,pass:!!c,info:i||''}),saved=S,pAt=UI.at,pW=UI.walk,kb=$('kbar');TEST=true;NOSPAWN=true;
+ try{
+  S=newState();applyUpgrades();openShop();S.time=18*60;
+  const s0=S.inv.soda,m0=S.money;kBin('fridge','soda');kBin('fridge','soda');kBin('fridge','soda');
+  const r=returnBottle('soda');
+  ok('F1. Lấy 3 chai → bấm "−" → còn 2, tồn kho +1, tiền không đổi',r.ok&&S.carry.filter(d=>d.r==='soda').length===2&&S.inv.soda===s0-2&&S.money===m0);
+  S.carry=[];const c=spawnCustomer({type:'hocsinh'});c.state='WAITING_FOOD';c.pcId=1;c.order={id:1,items:[{r:'cola',top:[],done:false}],t:0};
+  kBin('fridge','cola');kBin('fridge','cola');const kept=S.carry[0];refreshMatch();const matched=MATCH.byObj.get(kept)?kept:S.carry[1];
+  returnBottle('cola');
+  ok('F2. 2 chai cùng loại, 1 chai có khách nhận → trả chai CHƯA có khách',S.carry.length===1&&S.carry[0]===matched&&!!refreshMatch().byObj.get(S.carry[0]));
+  ok('F3. Chưa lấy chai nào → không trả được',returnBottle('water').err==='err_nothing_return');
+  S.carry=[newDish('soda')];UI.at='fridge';UI.walk=null;kb._k=null;renderKBar();decorateFridge();
+  ok('F4. Đã lấy chai → thẻ có nút "−"',!!kb.querySelector('[data-kb="ret:fridge:soda"]'));
+  ok('F5. Chưa lấy chai → thẻ không có nút "−"',!kb.querySelector('[data-kb="ret:fridge:cola"]'));
+ }catch(err){ok('Lỗi test F: '+err.message,false)}
+ S=saved;TEST=false;NOSPAWN=false;UI.at=pAt;UI.walk=pW;kb._k=null;applyUpgrades();return R}
+try{EXTRA_TESTS.push(runTestsF)}catch(e){setTimeout(()=>EXTRA_TESTS.push(runTestsF),0)}
 init();
 </script>
 </body>
