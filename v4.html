@@ -2145,6 +2145,38 @@ function runTestsE(){
  }catch(err){ok('Lỗi test E: '+err.message,false)}
  S=saved;SERVING=sv;TEST=false;NOSPAWN=false;UI.at=pAt;UI.walk=pW;kb._k=null;applyUpgrades();return R}
 try{EXTRA_TESTS.push(runTestsE)}catch(e){setTimeout(()=>EXTRA_TESTS.push(runTestsE),0)}
+ /* ================= PATCH E2 — BADGE ĐỎ xN Ở GÓC THẺ, CHO MỌI TỦ ================= */
+(function(){const st=document.createElement('style');st.textContent=`
+.cnt.qty{background:var(--sec)!important}
+.kbn .bq{position:absolute;top:-9px;right:-9px;background:var(--sec);color:#fff;border:2px solid var(--dark);border-radius:999px;font-size:10px;font-weight:900;padding:0 4px;line-height:1.4;font-style:normal;pointer-events:none;z-index:3}
+.kbn.selq{outline:3px solid var(--blue);outline-offset:1px;background:#E6F1FB}`;document.head.appendChild(st)})();
+const CAB=['noodlebox','freezer','fridge'];
+function binQty(st,id){
+ if((st==='noodlebox'||st==='freezer')&&S.hand&&S.hand.k==='raw'&&S.hand.b===id)return 1;
+ if(st==='fridge')return S.carry.filter(d=>d.r===id).length;return 0}
+/* Ngăn tủ trên bản đồ: sáng viền + badge đỏ xN khi đã chọn */
+function updateBinQty(){if(!S)return;
+ document.querySelectorAll('.kbn').forEach(el=>{const[st,id]=el.dataset.id.split(':');if(!CAB.includes(st))return;const q=binQty(st,id),k=String(q);
+  if(el._q===k)return;el._q=k;el.classList.toggle('selq',q>0);let b=el.querySelector('.bq');
+  if(q>0){if(!b){b=document.createElement('i');b.className='bq';el.appendChild(b)}b.textContent='x'+q}else if(b)b.remove()})}
+setInterval(()=>{if(S&&!TEST)updateBinQty()},150);
+function runTestsE2(){
+ const R=[],ok=(n,c,i)=>R.push({n,pass:!!c,info:i||''}),saved=S;TEST=true;NOSPAWN=true;
+ const badge=(st,id)=>{const e=$('kb-'+st+'-'+id);return e?{on:e.classList.contains('selq'),txt:(e.querySelector('.bq')||{}).textContent||''}:null};
+ try{
+  S=newState();S.day=3;applyUpgrades();openShop();updateBinQty();
+  ok('E5. Chưa chọn → ngăn tủ không có badge',badge('freezer','cavien').txt==='');
+  kBin('freezer','cavien');updateBinQty();const b1=badge('freezer','cavien');
+  ok('E6. Bấm Cá viên (Tủ đông) → ngăn sáng + badge đỏ x1',b1.on&&b1.txt==='x1');
+  kBin('freezer','cavien');updateBinQty();
+  ok('E7. Bấm lại (trả về kho) → mất badge',badge('freezer','cavien').txt===''&&!badge('freezer','cavien').on);
+  kBin('noodlebox','mi_bo');updateBinQty();
+  ok('E8. Thùng mì: chọn Mì bò → badge x1',badge('noodlebox','mi_bo').txt==='x1');
+  S.hand=null;kBin('fridge','soda');kBin('fridge','soda');kBin('fridge','soda');updateBinQty();
+  ok('E9. Tủ lạnh: lấy 3 chai → badge x3',badge('fridge','soda').txt==='x3');
+ }catch(err){ok('Lỗi test E2: '+err.message,false)}
+ S=saved;TEST=false;NOSPAWN=false;applyUpgrades();document.querySelectorAll('.kbn').forEach(e=>{e._q=null});return R}
+try{EXTRA_TESTS.push(runTestsE2)}catch(e){setTimeout(()=>EXTRA_TESTS.push(runTestsE2),0)}
 init();
 </script>
 </body>
