@@ -1683,7 +1683,7 @@ function runTests(){
   /* ---- 8. Nhân viên ---- */
   fresh();
   ok('S1. Thuê đầu bếp → chỉ được 1 người',okr(hireStaff('cook'))&&hireStaff('cashier').err==='err_staff_one');
-  const sc=seat();giveOrder(sc,[['mi_cay',['trung']],['cavien'],['tra_dao'],['water']]);
+  S.upg.pickup=true;const sc=seat();giveOrder(sc,[['mi_cay',['trung']],['cavien'],['tra_dao'],['water']]);
   const cooked=until(()=>['mi_cay','cavien','tra_dao','water'].every(r=>S.pickup.some(d=>d&&d.r===r)),150);
   ok('S2. Đầu bếp tự làm đủ 4 món, đặt lên Quầy ra món',cooked&&S.pickup.some(d=>d&&d.r==='mi_cay'&&d.top.includes('trung')),S.pickup.filter(Boolean).map(d=>d.r).join(', '));
   ok('S3. Người chơi không phải nấu: tay và khay vẫn trống',!S.hand&&!S.carry.length);
@@ -1945,6 +1945,69 @@ function runTestsB(){
  }catch(err){ok('Lỗi test B: '+err.message,false)}
  S=saved;SERVING=sv;TEST=false;NOSPAWN=false;return R}
 EXTRA_TESTS.push(runTestsB);
+ /* ================= PATCH C — QUẦY RA MÓN LÀ DỤNG CỤ ================= */
+Object.assign(STR.vi,{
+ upg_pickup:'Quầy ra món',upgd_pickup:'Kệ 6 ô để đầu bếp đặt món nấu xong. Chưa có kệ thì đầu bếp đặt món lên khay của bạn.',
+ upg_need_cook:'Cần thuê đầu bếp trước',err_need_cook:'Cần thuê đầu bếp trước khi mua Quầy ra món.',
+ toast_pickup_gift:'Tiệm có đầu bếp nên được tặng Quầy ra món 🎁',
+ staffd_cook:'Tự nấu mì (đúng topping), chiên, pha nước, lấy nước chai theo đơn và đặt lên khay của bạn (hoặc Quầy ra món nếu đã mua). Bạn chỉ cần giao cho khách.'});
+if(!UPG_BY.pickup){const U={id:'pickup',grp:'kitchen',price:800000,req:'cook'};UPGRADES.push(U);UPG_BY.pickup=U}
+(function(){const st=document.createElement('style');st.textContent='.nopu [data-act="kst"][data-id="pickup"]{display:none}';document.head.appendChild(st)})();
+const hasPickup=()=>!!(S&&S.upg&&S.upg.pickup);
+/* Áp dụng nâng cấp + ẩn/hiện Quầy ra món + chuyển save cũ (1 lần) */
+function applyUpgrades(){if(!S)return;const u=S.upg||(S.upg={});
+ if(S.verC==null){S.verC=1;
+  if(S.staff&&S.staff.type==='cook'&&!u.pickup){u.pickup=true;if(!TEST)setTimeout(()=>fx.toast(t('toast_pickup_gift'),'ok'),700)}
+  if(!u.pickup)S.pickup=S.pickup.map(d=>{if(d&&S.carry.length<carryMax()){S.carry.push(d);return null}return null})}
+ COOK.noodle.T=u.stove_fast?4:6;COOK.fried.T=u.fryer_fast?3.5:5;COOK.shake=u.shaker?1:2;
+ const b=u.monitor?2000:0;for(const p of S.pcs)p.hourlyRate=PC_TIERS[p.tier].rate+b;
+ document.body.classList.toggle('nopu',!u.pickup)}
+/* Món xong đi đâu: đầu bếp → Quầy ra món nếu có, không thì lên khay của bạn */
+function canFinish(){
+ if(ACTOR==='cook')return hasPickup()?S.pickup.includes(null):S.carry.length<carryMax();
+ return S.carry.length<carryMax()||(hasPickup()&&S.pickup.includes(null))}
+function finishDish(d){
+ if(ACTOR==='cook'){
+  if(hasPickup()){const i=S.pickup.indexOf(null);if(i<0)return false;S.pickup[i]=d;return true}
+  if(S.carry.length<carryMax()){S.carry.push(d);return true}return false}
+ if(S.carry.length<carryMax()){S.carry.push(d);return true}
+ if(hasPickup()){const i=S.pickup.indexOf(null);if(i>=0){S.pickup[i]=d;fx.toast(t('toast_park'));return true}}
+ return false}
+/* Mua nâng cấp: Quầy ra món cần có đầu bếp */
+function buyUpgrade(id){const U=UPG_BY[id];if(!U)return KE('err_generic');if(S.upg[id])return KE('err_upg_owned');
+ if(U.req==='cook'&&!(S.staff&&S.staff.type==='cook'))return KE('err_need_cook');
+ if(S.phase==='REPORT')return KE('err_report');if(S.money<U.price)return KE('err_money');
+ addTx(-U.price,'UPGRADE',t('upg_'+id));S.today.upgrade=(S.today.upgrade||0)+U.price;S.upg[id]=true;applyUpgrades();return KO('UPGRADE')}
+BUILD.upg=function(){const u=S.upg,cook=!!(S.staff&&S.staff.type==='cook');
+ const g=grp=>UPGRADES.filter(x=>x.grp===grp).map(x=>{const own=u[x.id],lock=x.req==='cook'&&!cook&&!own;
+  return`<div class="scard ${own?'on':''}"><div class="grow"><b>${t('upg_'+x.id)}</b><p class="muted" style="margin:4px 0">${t('upgd_'+x.id)}</p>${own?`<span class="badge ok">${t('upg_owned')}</span>`:lock?`<span class="badge warn">🔒 ${t('upg_need_cook')}</span>`:`<button class="sm pri" data-ui="upg" data-a="${x.id}">${t('upg_buy')} · ${vk(x.price)}</button>`}</div></div>`}).join('');
+ return`<h3>${t('upg_t')} <span class="muted">· ${vnd(S.money)}</span></h3><h4>${t('upg_kitchen')}</h4>${g('kitchen')}<h4>${t('upg_room')}</h4>${g('room')}`};
+function runTestsC(){
+ const R=[],ok=(n,c,i)=>R.push({n,pass:!!c,info:i||''}),saved=S,sv=SERVING;TEST=true;NOSPAWN=true;SERVING=null;
+ const until=(fn,max)=>{for(let i=0;i<(max||600)&&!fn();i++)stepSim(1);return!!fn()};
+ const seat=()=>{const c=spawnCustomer({type:'sinhvien'});c.money=500000;c.balance=200000;c.gamingTime=9999;until(()=>c.state==='QUEUE',30);
+  assignPC(c,S.pcs.find(p=>p.status==='AVAILABLE'));until(()=>c.state==='PLAYING',40);c.hunger=c.thirst=0;c.lastOrderT=S.time;return c};
+ const give=(c,items)=>{c.order={id:++S.seq.order,items:items.map(([r,top])=>({r,top:top||[],done:false})),t:S.time};c.state='WAITING_FOOD';c.orderPatienceMax=c.orderPatience=900;refreshMatch()};
+ try{
+  S=newState();S.money=S.today.startMoney=20000000;applyUpgrades();openShop();S.time=18*60;
+  ok('C1. Mặc định không có Quầy ra món (ẩn trên bản đồ)',!hasPickup()&&document.body.classList.contains('nopu'));
+  ok('C2. Chưa có đầu bếp → không mua được Quầy ra món',buyUpgrade('pickup').err==='err_need_cook'&&!hasPickup());
+  hireStaff('cook');const c=seat();give(c,[['cola'],['cavien']]);
+  const both=until(()=>S.carry.some(d=>d.r==='cola')&&S.carry.some(d=>d.r==='cavien'),60);
+  ok('C3. Chưa có quầy → đầu bếp đặt món lên khay của bạn',both&&S.pickup.every(x=>!x),S.carry.map(d=>d.r).join(', '));
+  deliverTo(c);S.carry=[newDish('mi_tom'),newDish('mi_tom'),newDish('mi_tom'),newDish('mi_tom')];give(c,[['cola']]);const cola0=S.inv.cola;stepSim(5);
+  ok('C4. Khay đầy → đầu bếp đứng chờ, không mất món, không trừ kho',S.carry.length===4&&S.inv.cola===cola0&&S.pickup.every(x=>!x));
+  const m0=S.money;
+  ok('C5. Có đầu bếp → mua được Quầy ra món',buyUpgrade('pickup').ok&&hasPickup()&&S.money===m0-UPG_BY.pickup.price&&!document.body.classList.contains('nopu'));
+  S.carry=[];
+  ok('C6. Có quầy → đầu bếp đặt món lên Quầy ra món',until(()=>S.pickup.some(d=>d&&d.r==='cola'),10)&&!S.carry.length);
+  const o=newState();o.staff={type:'cook',hand:null,t:0,st:null,busy:0};S=deserialize(JSON.stringify(o));applyUpgrades();
+  ok('C7. Save cũ đang có đầu bếp → được tặng Quầy ra món',hasPickup());
+  const o2=newState();o2.pickup[0]={id:1,r:'cola',top:[],q:100};S=deserialize(JSON.stringify(o2));applyUpgrades();
+  ok('C8. Save cũ không có đầu bếp, quầy còn món → món chuyển về khay',!hasPickup()&&S.carry.length===1&&S.pickup.every(x=>!x));
+ }catch(err){ok('Lỗi test C: '+err.message,false)}
+ S=saved;SERVING=sv;TEST=false;NOSPAWN=false;applyUpgrades();return R}
+try{EXTRA_TESTS.push(runTestsC)}catch(e){setTimeout(()=>EXTRA_TESTS.push(runTestsC),0)}
 init();
 </script>
 </body>
