@@ -1047,3 +1047,150 @@ function cashierStep(){
  f.state='SERVING';sf.serving=f.id;return true}
 function staffTick(dt){const sf=S.staff;if(!sf||(S.phase!=='OPEN'&&S.phase!=='CLOSING'))return;const D=STAFF[sf.type];sf.t=(sf.t||0)+dt;
  let g=0;while(sf.t>=D.every&&g++<6){sf.t-=D.every;if(sf.type==='cook')cookAct();else cashierStep()}}
+ /* ================= 6. ART (SVG nguyên bản) ================= */
+const OL='stroke="#303030" stroke-width="2" stroke-linejoin="round"';
+const S2='stroke="#303030" stroke-width="1.5" stroke-linejoin="round"';
+const txt=(x,y,s,fs,fill)=>`<text x="${x}" y="${y}" font-size="${fs||9}" font-weight="900" fill="${fill||'#303030'}" text-anchor="middle" font-family="Nunito,sans-serif">${s}</text>`;
+function charSVG(L,o){o=o||{};const s=o.s||1,st='stroke="#303030" stroke-width="1.6" stroke-linejoin="round"';
+ const phones=`<path d="M5.5 18 Q5.5 2.5 20 2.5 Q34.5 2.5 34.5 18" fill="none" stroke="#303030" stroke-width="2.6"/><rect x="3" y="15" width="5.5" height="9" rx="2.5" fill="${L.accColor||'#E85D5D'}" ${st}/><rect x="31.5" y="15" width="5.5" height="9" rx="2.5" fill="${L.accColor||'#E85D5D'}" ${st}/>`;
+ let g=`<ellipse cx="20" cy="53" rx="11" ry="3" fill="rgba(0,0,0,.15)"/><rect x="13" y="40" width="6" height="12" rx="3" fill="${L.pants}" ${st}/><rect x="21" y="40" width="6" height="12" rx="3" fill="${L.pants}" ${st}/><path d="M9 46 Q9 29 20 29 Q31 29 31 46 Z" fill="${L.shirt}" ${st}/>`;
+ if(o.apron)g+=`<path d="M14 34 H26 V46 H14 Z" fill="#FFB84D" ${st}/>`;
+ if(!o.back&&L.style===1)g+=`<path d="M6 18 Q5 4 20 4 Q35 4 34 18 L34 31 Q31 33 28 30 L12 30 Q9 33 6 31 Z" fill="${L.hair}" ${st}/>`;
+ if(L.style===3)g+=`<circle cx="20" cy="4" r="4.5" fill="${L.hair}" ${st}/>`;
+ g+=`<circle cx="20" cy="18" r="13" fill="${L.skin}" ${st}/>`;
+ if(o.back){g+=`<path d="M7 18 Q6 4 20 4 Q34 4 33 18 Q34 30 20 31 Q6 30 7 18 Z" fill="${L.hair}" ${st}/>`;if(L.acc===3)g+=phones}
+ else{const hs=[`<path d="M7 17 Q6 4 20 4 Q34 4 33 17 Q29 11 22 12 Q16 9 7 17 Z" fill="${L.hair}" ${st}/>`,`<path d="M7 16 Q8 5 20 5 Q32 5 33 16 Q26 9 20 12 Q14 9 7 16 Z" fill="${L.hair}" ${st}/>`,`<path d="M7 16 L9 6 L13 10 L16 3 L20 9 L24 3 L27 10 L31 6 L33 16 Q26 11 20 12 Q14 11 7 16 Z" fill="${L.hair}" ${st}/>`,`<path d="M7 17 Q6 4 20 4 Q34 4 33 17 Q27 10 20 11 Q13 10 7 17 Z" fill="${L.hair}" ${st}/>`];
+  g+=hs[L.style]||hs[0];
+  g+=`<circle cx="15" cy="20" r="1.9" fill="#303030"/><circle cx="25" cy="20" r="1.9" fill="#303030"/><ellipse cx="12" cy="24" rx="2.2" ry="1.3" fill="#FF7A59" opacity=".45"/><ellipse cx="28" cy="24" rx="2.2" ry="1.3" fill="#FF7A59" opacity=".45"/>`;
+  const m=o.mood==null?2:o.mood,ms='fill="none" stroke="#303030" stroke-width="1.6" stroke-linecap="round"';
+  g+=m===2?`<path d="M17 25 Q20 28.5 23 25" ${ms}/>`:m===1?`<path d="M17.5 26 H22.5" ${ms}/>`:`<path d="M17 27.5 Q20 24.5 23 27.5" ${ms}/>`;
+  if(L.acc===1)g+=`<path d="M6.5 14 Q7 3 20 3 Q33 3 33.5 14 Z" fill="${L.accColor}" ${st}/><path d="M6 14 H27 Q25 18 6 16 Z" fill="${L.accColor}" ${st}/>`;
+  if(L.acc===2)g+=`<circle cx="15" cy="20" r="3.6" fill="none" stroke="#303030" stroke-width="1.4"/><circle cx="25" cy="20" r="3.6" fill="none" stroke="#303030" stroke-width="1.4"/><path d="M18.6 20 H21.4" stroke="#303030" stroke-width="1.4"/>`;
+  if(L.acc===3)g+=phones}
+ return`<svg viewBox="0 0 40 56" width="${40*s}" height="${56*s}" aria-hidden="true">${g}</svg>`}
+function pcDeskSVG(tier){const hs=tier!=='thuong';
+ return`<svg viewBox="0 0 100 64" width="100" height="64" aria-hidden="true"><rect x="4" y="30" width="92" height="30" rx="7" fill="#C99A6B" ${OL}/><rect x="7" y="53" width="86" height="5" rx="2" fill="#A97E55"/>
+ <rect x="80" y="10" width="13" height="32" rx="3" fill="${tier==='vip'?'#3a2d55':'#4a4a4a'}" ${OL}/>${hs?'<circle cx="86.5" cy="18" r="2" fill="#5CC8A1"/>':''}
+ <rect x="47" y="30" width="8" height="6" fill="#555"/><rect x="24" y="3" width="54" height="30" rx="4" fill="#303030" ${OL}/><rect class="scr" x="28" y="7" width="46" height="22" rx="2"/>
+ <g class="game"><rect x="32" y="20" width="8" height="5" fill="#5CC8A1"/><rect x="44" y="13" width="10" height="12" fill="#FFB84D"/><rect x="58" y="17" width="10" height="8" fill="#FF7A59"/></g>
+ <rect x="30" y="40" width="34" height="9" rx="2" fill="#f2f2f2" stroke="#303030" stroke-width="1.5"/><ellipse cx="72" cy="45" rx="3.5" ry="4.5" fill="#f2f2f2" stroke="#303030" stroke-width="1.5"/>
+ ${hs?'<path d="M10 45 q0 -9 8 -9 q8 0 8 9" fill="none" stroke="#303030" stroke-width="2.5"/><rect x="8" y="42" width="5" height="8" rx="2" fill="#E85D5D"/><rect x="23" y="42" width="5" height="8" rx="2" fill="#E85D5D"/>':''}</svg>`}
+function chairSVG(tier){const c=PC_TIERS[tier].chair;
+ if(tier==='thuong')return`<svg viewBox="0 0 100 46" width="100" height="46" aria-hidden="true"><rect x="38" y="30" width="4" height="12" fill="#303030"/><rect x="58" y="30" width="4" height="12" fill="#303030"/><rect x="34" y="6" width="32" height="26" rx="12" fill="${c}" ${OL}/></svg>`;
+ return`<svg viewBox="0 0 100 46" width="100" height="46" aria-hidden="true"><rect x="31" y="4" width="38" height="22" rx="8" fill="${c}" ${OL}/><rect x="28" y="18" width="44" height="25" rx="10" fill="${c}" ${OL}/><rect x="40" y="25" width="20" height="10" rx="4" fill="${tier==='vip'?'#F7D774':'#303030'}"/></svg>`}
+const counterSVG=()=>`<svg viewBox="0 0 200 76" width="200" height="76" aria-hidden="true"><rect x="2" y="22" width="196" height="52" rx="8" fill="#FF7A59" ${OL}/><rect x="2" y="4" width="196" height="26" rx="8" fill="#FFB84D" ${OL}/><rect x="16" y="8" width="36" height="16" rx="3" fill="#4a4a4a" ${OL}/><rect x="22" y="11" width="16" height="5" fill="#5CC8A1"/><rect x="96" y="8" width="16" height="16" rx="2" fill="#fff" ${OL}/><rect x="99" y="11" width="4" height="4" fill="#303030"/><rect x="105" y="17" width="4" height="4" fill="#303030"/><rect x="140" y="6" width="34" height="20" rx="3" fill="#303030"/><rect x="143" y="9" width="28" height="13" rx="2" fill="#5B9DEF"/>${txt(100,56,'QUẦY THU NGÂN',13,'#fff')}</svg>`;
+const doorSVG=()=>`<svg viewBox="0 0 90 44" width="90" height="44" aria-hidden="true"><rect x="2" y="2" width="86" height="40" rx="6" fill="#bfe2f5" ${OL}/><path d="M45 2 v40" stroke="#303030" stroke-width="2"/><rect x="12" y="28" width="66" height="12" rx="5" fill="#E85D5D"/>${txt(45,37,'CHÀO MỪNG',7,'#fff')}</svg>`;
+const benchSVG=()=>`<svg viewBox="0 0 110 36" width="110" height="36" aria-hidden="true"><rect x="10" y="20" width="6" height="14" fill="#8a6440"/><rect x="94" y="20" width="6" height="14" fill="#8a6440"/><rect x="2" y="6" width="106" height="16" rx="6" fill="#C99A6B" ${OL}/></svg>`;
+const plantSVG=()=>`<svg viewBox="0 0 40 52" width="40" height="52" aria-hidden="true"><circle cx="13" cy="18" r="9" fill="#58B368" ${OL}/><circle cx="27" cy="16" r="9" fill="#5CC8A1" ${OL}/><circle cx="20" cy="8" r="8" fill="#58B368" ${OL}/><path d="M9 30 H31 L28 50 H12 Z" fill="#FF7A59" ${OL}/></svg>`;
+const signSVG=()=>`<svg viewBox="0 0 200 24" width="200" height="24" aria-hidden="true"><rect x="2" y="2" width="196" height="20" rx="10" fill="#303030"/>${txt(100,17,'★ TIỆM NET ★',13,'#FFB84D')}</svg>`;
+/* ---------- món ăn ở từng giai đoạn ---------- */
+const NOODLE_COL={mi:'#F2B84B',mi_bo:'#C0603A',mi_ga:'#E9C46A',mi_cay:'#E85D5D'},BROTH={mi:'#F0B860',mi_bo:'#C9773F',mi_ga:'#EFCB6A',mi_cay:'#E2553B'};
+const FRY_COL={cavien:'#F4E3C1',bovien:'#C9A58A',tomvien:'#F6C9B8',xucxich:'#E9A08C',holo:'#EBD3A8'},COOK_COL={under:'#EBC27A',perfect:'#DB9A4E',over:'#9E5B2A',ruined:'#3a2a20'};
+const BOTTLE_COL={energy:'#E85D5D',cola:'#7a4b2a',water:'#9fd3f5',soda:'#7BC67E'};
+const smokeG=()=>`<path d="M10 7 q-3-3 0-5 M16 7 q-3-3 0-5 M22 7 q-3-3 0-5" stroke="#555" fill="none" stroke-width="1.6"/>`;
+const steamG=()=>`<path d="M11 8 q-2-2 0-4 M16 8 q-2-2 0-4 M21 8 q-2-2 0-4" stroke="#aaa" fill="none" stroke-width="1.2"/>`;
+function packG(b){const c=NOODLE_COL[b]||'#F2B84B';return`<rect x="4" y="8" width="24" height="17" rx="3" fill="${c}" ${S2}/><path d="M8 14 q3-3 6 0 q3 3 6 0 q2-2 4 0" stroke="#fff" fill="none" stroke-width="1.6"/><rect x="5" y="21" width="22" height="3" fill="#000" opacity=".12"/>`}
+function openG(b){const c=NOODLE_COL[b]||'#F2B84B';return`<path d="M4 15 l3-3 3 3 3-3 3 3 3-3 3 3 3-3 3 3 V27 H4 Z" fill="${c}" ${S2}/><rect x="8" y="5" width="16" height="11" rx="2" fill="#F7E3A1" ${S2}/><path d="M10 9 q2-2 4 0 q2 2 4 0 q2-2 3 0 M10 12 q2-2 4 0 q2 2 4 0" stroke="#d9a441" fill="none" stroke-width="1.1"/>`}
+function topG(top){let g='';(top||[]).forEach((x,i)=>{const dx=[0,-6,6][i]||0;
+ if(x==='trung')g+=`<ellipse cx="${19+dx}" cy="14" rx="3.6" ry="2.4" fill="#fff" stroke="#303030" stroke-width="1"/><circle cx="${19+dx}" cy="14" r="1.3" fill="#FFB84D"/>`;
+ else if(x==='xucxich')g+=`<circle cx="${12+dx}" cy="14" r="2" fill="#D9573F" stroke="#303030" stroke-width="1"/><circle cx="${15.5+dx}" cy="13" r="2" fill="#D9573F" stroke="#303030" stroke-width="1"/>`;
+ else if(x==='cavien')g+=`<circle cx="${21+dx}" cy="15" r="2.1" fill="#DB9A4E" stroke="#303030" stroke-width="1"/><circle cx="${24+dx}" cy="13.5" r="2.1" fill="#DB9A4E" stroke="#303030" stroke-width="1"/>`;
+ else if(x==='rau')g+=`<path d="M${8+dx} 15 q2-4 6-2 q-3 3-6 2z" fill="#58B368" stroke="#303030" stroke-width=".8"/><path d="M${10+dx} 12 q3-3 5 0 q-3 2-5 0z" fill="#7BC67E"/>`});return g}
+function bowlG(b,top,mode){const fill=mode==='cooked'?(BROTH[b]||'#F0B860'):'#F7E3A1';
+ let g=`<path d="M3 15 H29 A13 12 0 0 1 3 15 Z" fill="#fff" ${S2}/><path d="M9 27 H23" stroke="#303030" stroke-width="1.5"/><ellipse cx="16" cy="15" rx="13" ry="3.6" fill="${fill}" ${S2}/><path d="M7 15 q2-2 4 0 q2 2 4 0 q2-2 4 0 q2 2 4 0" stroke="#d9a441" fill="none" stroke-width="1.3"/>`;
+ if(mode!=='bowl')g+=`<circle cx="10" cy="14" r=".9" fill="#E85D5D"/><circle cx="14" cy="16" r=".9" fill="#FF7A59"/><circle cx="22" cy="15.5" r=".9" fill="#E85D5D"/>`;
+ return g+topG(top)+(mode==='cooked'?steamG():'')}
+function potG(w){const cs=cookState(w.t,COOK.noodle),br=cs==='ruined'?'#7a5a32':cs==='over'?'#d8b36a':(BROTH[w.b]||'#F0B860');
+ return`<rect x="3" y="12" width="26" height="16" rx="4" fill="#9AA3AD" ${S2}/><rect x="0" y="14" width="4" height="3" rx="1" fill="#303030"/><rect x="28" y="14" width="4" height="3" rx="1" fill="#303030"/><ellipse cx="16" cy="12" rx="13" ry="3.8" fill="${br}" ${S2}/><path d="M8 12 q2-2 4 0 q2 2 4 0 q2-2 4 0 q2 2 3 0" stroke="#d9a441" fill="none" stroke-width="1.2"/>${topG(w.top)}${cs==='ruined'?smokeG():steamG()}`}
+function fryG(b,state,ox,oy){ox=ox||0;oy=oy||0;const c=state==='raw'?(FRY_COL[b]||'#eee'):(COOK_COL[state]||'#DB9A4E'),s=`fill="${c}" stroke="#303030" stroke-width="1.3"`;
+ if(b==='xucxich')return`<rect x="${7+ox}" y="${12+oy}" width="18" height="7" rx="3.5" ${s}/><path d="M${11+ox} ${13+oy} v5 M${16+ox} ${13+oy} v5 M${21+ox} ${13+oy} v5" stroke="#303030" stroke-width=".8" opacity=".5"/>`;
+ if(b==='holo')return`<circle cx="${12+ox}" cy="${16+oy}" r="4.5" ${s}/><circle cx="${19+ox}" cy="${15+oy}" r="3.5" ${s}/><path d="M${21+ox} ${12+oy} l3 -3" stroke="#303030" stroke-width="1.2"/>`;
+ return`<path d="M${4+ox} ${24+oy} L${28+ox} ${6+oy}" stroke="#C99A6B" stroke-width="1.6"/><circle cx="${10+ox}" cy="${19.5+oy}" r="4" ${s}/><circle cx="${16+ox}" cy="${15+oy}" r="4" ${s}/><circle cx="${22+ox}" cy="${10.5+oy}" r="4" ${s}/>`}
+function basketG(w){const cs=cookState(w.t,COOK.fried),vis=(cs==='under'&&w.t<COOK.fried.T*.5)?'raw':cs;
+ return`<rect x="2" y="8" width="28" height="20" rx="4" fill="#F2B84B" ${S2}/><circle cx="7" cy="12" r="1.2" fill="#fff8c4"/><circle cx="25" cy="22" r="1.2" fill="#fff8c4"/>${fryG(w.b,vis,0,-1)}${cs==='ruined'?smokeG():''}`}
+function plateG(b,cook,sauce){return`<ellipse cx="16" cy="22" rx="14" ry="6" fill="#fff" ${S2}/>${fryG(b,cook,0,1)}${sauce?'<path d="M7 15 l3 2 3-2 3 2 3-2 3 2 3-2" stroke="#E85D5D" stroke-width="1.8" fill="none" stroke-linecap="round"/>':''}`}
+function cupG(w){let f='#EEF8FC';
+ if(w.base==='tra')f=w.flavor==='dao'?'#F0A060':w.flavor==='chanh'?'#E2A23B':w.flavor==='sua'?'#d8b48a':'#D9822B';
+ if(w.base==='caphe')f=w.flavor==='sua'?'#A8744A':'#5A3A22';if(!w.base&&w.flavor==='sua')f='#fafafa';
+ let g=`<path d="M7 7 H25 L23 29 H9 Z" fill="${f}" ${S2}/>`;
+ if(w.ice)g+=`<rect x="11" y="10" width="5" height="5" rx="1" fill="#fff" opacity=".85" stroke="#8cc" stroke-width=".8"/><rect x="16" y="14" width="5" height="5" rx="1" fill="#fff" opacity=".85" stroke="#8cc" stroke-width=".8"/>`;
+ if(w.flavor==='chanh')g+=`<circle cx="22" cy="8" r="4" fill="#F7E07A" stroke="#303030" stroke-width="1"/><path d="M22 4 v8 M18 8 h8" stroke="#e8c84a" stroke-width=".8"/>`;
+ if(w.flavor==='dao')g+=`<path d="M12 22 q3-4 6 0 q-3 3-6 0z" fill="#F7A072" stroke="#303030" stroke-width=".8"/>`;
+ if(w.flavor==='sua'&&w.base)g+=`<path d="M11 20 q5-3 10 0" stroke="#fff" stroke-width="1.5" fill="none"/>`;
+ if(w.st==='done')g+=`<path d="M6 7 Q16 1 26 7 Z" fill="#fff" opacity=".9" ${S2}/><path d="M17 5 L21 0" stroke="#E85D5D" stroke-width="2"/>`;
+ return g}
+const bottleG=c=>`<path d="M13 3 H19 V8 L22 12 V27 Q22 29 20 29 H12 Q10 29 10 27 V12 L13 8 Z" fill="${c||'#ccc'}" ${S2}/><rect x="10" y="15" width="12" height="6" fill="#fff" opacity=".85"/>`;
+const trashG=()=>`<path d="M5 24 q2-10 11-10 q9 0 11 10 q-11 6-22 0z" fill="#3a2a20" ${S2}/>`+smokeG();
+function dishG(r,top){const R=MENU_BY[r];if(!R)return'';
+ if(R.type==='noodle')return bowlG(R.base,top,'cooked');
+ if(R.type==='fried')return plateG(R.base,'perfect',true);
+ if(R.type==='mix'){const m=MIX[R.id];return cupG({base:m.base,flavor:m.flavor,ice:true,st:'done'})}
+ return bottleG(BOTTLE_COL[R.id])}
+function wiSVG(w,s){s=s||32;let g='';
+ if(w.k==='dish'||w.r)g=dishG(w.r,w.top);
+ else switch(w.k){
+  case'raw':g=w.cat==='noodle'?packG(w.b):fryG(w.b,'raw');break;
+  case'prep':if(w.cat==='noodle'){const f=w.done?1:w.t/PREP.noodle;g=f<.34?openG(w.b):bowlG(w.b,w.top,f<.67?'bowl':'seasoned')}
+   else{const f=w.done?1:w.t/PREP.fried;g=plateG(w.b,w.cook,f>=.5)}break;
+  case'bowl':g=bowlG(w.b,w.top,'seasoned');break;
+  case'pot':g=potG(w);break;case'fry':g=basketG(w);break;case'fried':g=fryG(w.b,w.cook);break;
+  case'cup':g=cupG(w);break;case'trash':g=trashG();break}
+ return`<svg viewBox="0 0 32 32" width="${s}" height="${s}" aria-hidden="true">${g}</svg>`}
+function binSVG(st,id,s){s=s||24;let g='';
+ if(st==='noodlebox')g=packG(id);else if(st==='freezer')g=fryG(id,'raw');else if(st==='fridge')g=bottleG(BOTTLE_COL[id]);
+ else switch(id){
+  case'trung':g=`<ellipse cx="16" cy="17" rx="8" ry="10" fill="#fff" ${S2}/>`;break;
+  case'xucxich':g=`<circle cx="11" cy="17" r="5" fill="#D9573F" ${S2}/><circle cx="21" cy="15" r="5" fill="#D9573F" ${S2}/>`;break;
+  case'cavien':g=`<circle cx="10" cy="19" r="5" fill="#F4E3C1" ${S2}/><circle cx="21" cy="18" r="5" fill="#F4E3C1" ${S2}/><circle cx="16" cy="10" r="5" fill="#F4E3C1" ${S2}/>`;break;
+  case'rau':g=`<path d="M6 24 q4-14 14-14 q-2 12-14 14z" fill="#58B368" ${S2}/><path d="M14 27 q4-10 13-12 q-3 10-13 12z" fill="#7BC67E" ${S2}/>`;break;
+  case'ly':g=`<path d="M8 6 H24 L22 28 H10 Z" fill="#EEF8FC" ${S2}/><path d="M8.5 11 H23.5 M9 16 H23" stroke="#9cc" stroke-width="1"/>`;break;
+  case'da':g=`<rect x="5" y="12" width="10" height="10" rx="2" fill="#E6F6FB" ${S2}/><rect x="16" y="7" width="10" height="10" rx="2" fill="#E6F6FB" ${S2}/><rect x="14" y="18" width="10" height="10" rx="2" fill="#E6F6FB" ${S2}/>`;break;
+  case'tra':g=`<rect x="7" y="9" width="18" height="19" rx="3" fill="#D9822B" ${S2}/><rect x="9" y="4" width="14" height="6" rx="1.5" fill="#6b4a2a" ${S2}/>`;break;
+  case'caphe':g=`<rect x="7" y="9" width="18" height="19" rx="3" fill="#5A3A22" ${S2}/><rect x="9" y="4" width="14" height="6" rx="1.5" fill="#303030" ${S2}/>`;break;
+  case'chanh':g=`<circle cx="16" cy="16" r="10" fill="#F7E07A" ${S2}/><path d="M16 6 v20 M6 16 h20 M9 9 l14 14 M23 9 l-14 14" stroke="#e8c84a" stroke-width="1"/>`;break;
+  case'dao':g=`<circle cx="16" cy="18" r="10" fill="#F7A072" ${S2}/><path d="M16 8 q3-4 7-3" stroke="#58B368" stroke-width="2" fill="none"/>`;break;
+  case'sua':g=`<rect x="8" y="7" width="16" height="20" rx="3" fill="#f4f4f4" ${S2}/><rect x="8" y="13" width="16" height="8" fill="#5B9DEF"/>`;break}
+ return`<svg viewBox="0 0 32 32" width="${s}" height="${s}" aria-hidden="true">${g}</svg>`}
+const KSVG={
+ storage:`<svg viewBox="0 0 76 100" width="76" height="100" aria-hidden="true"><rect x="3" y="6" width="70" height="88" rx="7" fill="#C99A6B" ${OL}/><rect x="8" y="12" width="60" height="76" rx="4" fill="#A97E55"/><rect x="8" y="48" width="60" height="4" fill="#8a6440"/><rect x="12" y="20" width="24" height="28" rx="3" fill="#F2B84B" ${OL}/><rect x="40" y="26" width="22" height="22" rx="3" fill="#FF7A59" ${OL}/><rect x="12" y="58" width="28" height="28" rx="3" fill="#5B9DEF" ${OL}/><rect x="44" y="62" width="18" height="24" rx="3" fill="#5CC8A1" ${OL}/></svg>`,
+ noodlebox:`<svg viewBox="0 0 70 100" width="70" height="100" aria-hidden="true"><rect x="3" y="4" width="64" height="92" rx="6" fill="#C99A6B" ${OL}/><rect x="3" y="80" width="64" height="16" rx="6" fill="#A97E55" ${OL}/>${txt(35,92,'MÌ GÓI',9,'#fff')}</svg>`,
+ freezer:`<svg viewBox="0 0 78 100" width="78" height="100" aria-hidden="true"><rect x="3" y="4" width="72" height="92" rx="8" fill="#F4F7FB" ${OL}/><rect x="3" y="80" width="72" height="16" rx="8" fill="#5B9DEF" ${OL}/>${txt(39,92,'TỦ ĐÔNG',9,'#fff')}</svg>`,
+ board:`<svg viewBox="0 0 170 100" width="170" height="100" aria-hidden="true"><rect x="2" y="2" width="166" height="94" rx="8" fill="#ECE6DC" ${OL}/><rect x="7" y="3" width="156" height="52" rx="6" fill="#E3C397" ${OL}/><rect x="2" y="58" width="166" height="38" rx="8" fill="#D6CCBC" ${OL}/></svg>`,
+ stove:`<svg viewBox="0 0 110 100" width="110" height="100" aria-hidden="true"><rect x="2" y="6" width="106" height="88" rx="8" fill="#ECE6DC" ${OL}/><rect x="6" y="10" width="98" height="56" rx="6" fill="#4a4a4a" ${OL}/><circle cx="32" cy="38" r="21" fill="none" stroke="#E85D5D" stroke-width="2"/><circle cx="78" cy="38" r="21" fill="none" stroke="#E85D5D" stroke-width="2"/><rect x="2" y="70" width="106" height="24" rx="8" fill="#D6CCBC" ${OL}/><circle cx="32" cy="82" r="5" fill="#fff" ${OL}/><circle cx="78" cy="82" r="5" fill="#fff" ${OL}/></svg>`,
+ fryer:`<svg viewBox="0 0 100 100" width="100" height="100" aria-hidden="true"><rect x="2" y="6" width="96" height="88" rx="8" fill="#ECE6DC" ${OL}/><rect x="4" y="10" width="92" height="56" rx="6" fill="#9AA3AD" ${OL}/><rect x="6" y="16" width="44" height="44" rx="5" fill="#F2B84B" ${OL}/><rect x="50" y="16" width="44" height="44" rx="5" fill="#F2B84B" ${OL}/><rect x="2" y="70" width="96" height="24" rx="8" fill="#D6CCBC" ${OL}/>${txt(50,86,'CHIÊN',10)}</svg>`,
+ bar:`<svg viewBox="0 0 170 100" width="170" height="100" aria-hidden="true"><rect x="2" y="2" width="166" height="94" rx="8" fill="#ECE6DC" ${OL}/><rect x="2" y="58" width="166" height="38" rx="8" fill="#5CC8A1" ${OL}/><rect x="120" y="8" width="42" height="44" rx="6" fill="#fff" ${OL}/><rect x="126" y="16" width="12" height="12" rx="2" fill="#E6F6FB" stroke="#8cc"/><rect x="142" y="22" width="12" height="12" rx="2" fill="#E6F6FB" stroke="#8cc"/>${txt(141,48,'PHA CHẾ',7)}</svg>`,
+ fridge:`<svg viewBox="0 0 70 110" width="70" height="110" aria-hidden="true"><rect x="3" y="3" width="64" height="104" rx="8" fill="#F4F7FB" ${OL}/><rect x="3" y="3" width="64" height="20" rx="8" fill="#5B9DEF" ${OL}/>${txt(35,17,'NƯỚC',8,'#fff')}<rect x="6" y="26" width="58" height="78" rx="4" fill="#CFE8F7" ${OL}/></svg>`,
+ trash:`<svg viewBox="0 0 32 46" width="32" height="46" aria-hidden="true"><rect x="5" y="10" width="22" height="34" rx="4" fill="#5f6b77" ${OL}/><rect x="3" y="5" width="26" height="7" rx="3" fill="#7d8a97" ${OL}/><path d="M12 18 v20 M16 18 v20 M20 18 v20" stroke="#303030" stroke-width="1" opacity=".5"/></svg>`,
+ pickup:`<svg viewBox="0 0 56 324" width="56" height="324" aria-hidden="true"><rect x="2" y="2" width="52" height="320" rx="8" fill="#C99A6B" ${OL}/><rect x="2" y="2" width="52" height="24" rx="8" fill="#58B368" ${OL}/>${txt(28,12,'QUẦY',8,'#fff')}${txt(28,22,'RA MÓN',8,'#fff')}</svg>`};
+
+/* ================= 6. WORLD ================= */
+const PCEL={};
+const AUTO_ST={stove:'stove_auto',fryer:'fryer_auto'};
+function wallMenuText(){return['mi_tom','mi_bo','cavien','tra_chanh','cafe_sua'].map(id=>menuName(id)+' '+vk(priceOf(id))).join(' · ')}
+function stEl(st){return document.querySelector(st==='storage'?'[data-act="storage"]':`[data-act="kst"][data-id="${st}"]`)}
+function buildWorld(){
+ let h=`<div class="ent kfloor"></div><div class="ent pcrug"></div>
+ <div class="ent qlane" style="left:112px;top:328px;width:56px;height:196px"></div><div class="ent qlane" style="left:168px;top:470px;width:112px;height:54px"></div>
+ <div class="zone" style="left:92px;top:322px">🧍 XẾP HÀNG</div>
+ <div class="ent" style="left:380px;top:3px;z-index:2">${signSVG()}</div><div class="ent wallmenu" id="wallmenu">${esc(wallMenuText())}</div>`;
+ h+=`<div class="ent" data-act="storage" tabindex="0" role="button" aria-label="${t('st_storage')}" style="left:16px;top:38px;width:76px;height:100px;z-index:138">${KSVG.storage}<div class="lbl">${t('st_storage')}</div></div>`;
+ for(const st in KIT){const K=KIT[st];
+  h+=`<div class="ent" data-act="kst" data-id="${st}" tabindex="0" role="button" aria-label="${t(K.name)}" style="left:${K.x}px;top:${K.y}px;width:${K.w}px;height:${K.h}px;z-index:${K.y+K.h}">${KSVG[st]}<div class="lbl">${t(K.name)}</div>`;
+  (K.spots||[]).forEach((p,i)=>{h+=`<div class="ks empty" id="ks-${st}-${i}" data-act="spot" data-id="${st}:${i}" role="button" aria-label="${t(K.name)} ${i+1}" style="left:${p[0]}px;top:${p[1]}px"></div>`});
+  (K.bins||[]).forEach(b=>{h+=`<div class="kbn" id="kb-${st}-${b[0]}" data-act="bin" data-id="${st}:${b[0]}" role="button" title="${esc(binName(st,b[0]))}" aria-label="${esc(binName(st,b[0]))}" style="left:${b[1]}px;top:${b[2]}px;width:${b[3]}px;height:${b[4]}px">${binSVG(st,b[0],Math.min(b[3],b[4])-4)}</div>`});
+  if(AUTO_ST[st])h+=`<div class="autob" id="auto-${st}" style="display:none">AUTO</div>`;
+  if(ST_LOCK[st])h+=`<div class="lockb">${t('lock_day',{d:UNLOCK[ST_LOCK[st]]})}</div>`;
+  h+='</div>'}
+ h+=`<div class="ent" data-act="kst" data-id="pickup" tabindex="0" role="button" aria-label="${t('st_pickup')}" style="left:${PICKUP.x}px;top:${PICKUP.y}px;width:${PICKUP.w}px;height:${PICKUP.h}px;z-index:${PICKUP.y+PICKUP.h}">${KSVG.pickup}`;
+ for(let i=0;i<CFG.PICKUP_N;i++){const p=pickupSlotPos(i);h+=`<div class="puslot" id="ks-pickup-${i}" data-act="spot" data-id="pickup:${i}" role="button" aria-label="${t('st_pickup')} ${i+1}" style="left:${p[0]}px;top:${p[1]}px"></div>`}
+ h+='</div>';
+ h+=`<div class="ent" data-act="counter" tabindex="0" role="button" aria-label="${t('st_counter')}" style="left:40px;top:240px;z-index:316">${counterSVG()}</div>`;
+ h+=`<div class="ent" style="left:25px;top:556px;z-index:2">${doorSVG()}</div><div class="ent" style="left:300px;top:540px;z-index:576">${benchSVG()}</div><div class="ent" style="left:440px;top:530px;z-index:582">${plantSVG()}</div>`;
+ h+=`<div class="zone" style="left:330px;top:178px">🖥 KHU MÁY</div>`;
+ for(const p of S.pcs)h+=`<div class="ent pc" id="pc${p.id}" data-act="pc" data-id="${p.id}" tabindex="0" role="button" aria-label="PC ${p.id}" style="left:${p.x}px;top:${p.y}px;width:100px;height:106px"><div class="desk" style="z-index:${p.y+60}">${pcDeskSVG(p.tier)}</div><div class="chair" style="z-index:${p.y+70}">${chairSVG(p.tier)}</div><div class="tag" style="z-index:${p.y+125}">#${pad(p.id)} · ${PC_TIERS[p.tier].name}<br><span class="pst"></span></div></div>`;
+ h+=`<div id="lay" class="ent"></div><div id="player" class="ent player"><div class="spr"></div><span class="ptag">${t('you')}</span><div class="hand"></div></div><div id="fx" class="ent" style="z-index:3000"></div>`;
+ $('world').innerHTML=h;S.pcs.forEach(p=>{PCEL[p.id]=$('pc'+p.id)});
+ $('player').firstChild.innerHTML=charSVG(PLAYER_LOOK,{apron:1})}
+function fit(){const vp=$('vp'),w=vp.clientWidth,h=vp.clientHeight;let s=Math.min(w/CFG.W,h/CFG.H);
+ if(w<700)s=Math.max(w/CFG.W,Math.min(.75,h/CFG.H));s=clamp(s,.3,1.6);
+ $('world').style.transform=`scale(${s})`;$('wrap').style.width=CFG.W*s+'px';$('wrap').style.height=CFG.H*s+'px'}
