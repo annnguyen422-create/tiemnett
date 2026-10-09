@@ -2223,6 +2223,14 @@ try{EXTRA_TESTS.push(runTestsF)}catch(e){setTimeout(()=>EXTRA_TESTS.push(runTest
 #kbar .kbs button .minus{background:var(--bad)!important;color:#fff!important}
 #world .kbn .bq{display:none!important}
 #world .kbn.selq{outline:none!important;background:rgba(255,255,255,.75)!important}`;document.head.appendChild(st)})();
+ /* ================= PATCH G3 — NÚT "−" CÙNG KÍCH THƯỚC BADGE x1 ================= */
+(function(){const st=document.createElement('style');st.textContent=`
+#kbar .kbs button .cnt.qty{min-width:30px;text-align:center}
+#kbar .kbs button[data-kb^="bin:fridge:"] > span.minus{position:absolute!important;top:-9px!important;left:-6px!important;right:auto!important;
+ width:auto!important;height:auto!important;min-width:30px!important;padding:0 7px!important;font-size:12px!important;font-weight:900!important;line-height:1.2!important;
+ border:2px solid var(--dark)!important;border-radius:999px!important;background:var(--bad)!important;color:#fff!important;text-align:center!important;transform:none;z-index:3}
+#kbar .kbs button[data-kb^="bin:fridge:"] > span.minus::before{content:'';position:absolute;inset:-10px}`;document.head.appendChild(st)})();
+const _setG3=BUILD.set;BUILD.set=function(){return _setG3().replace('v4-G2','v4-G3')};
 init();
 </script>
 </body>
