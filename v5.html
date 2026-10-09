@@ -828,3 +828,222 @@ function forecast(){
  const m=(0.6+S.rating*0.1)*(isWeekend(S.day)?1.3:1);const base=PERIODS.reduce((a,p,i)=>a+p.rate*(i===4?60:p.min),0)*m;
  const lo=Math.round(base*.85),hi=Math.round(base*1.15),r=(a,b)=>[Math.round(lo*a),Math.round(hi*b)];
  return{cust:[lo,hi],noodle:r(.35,.5),fried:r(.15,.3),drink:r(.5,.75)}}
+ /* ================= 5. KITCHEN ================= */
+let ACTOR='player',MATCH=null; /* ACTOR='cook' khi đầu bếp đang thao tác */
+const isCookItem=w=>!!(w&&w.by==='cook');
+function binName(st,id){return st==='fridge'?itemName(id):t('bin_'+id)}
+function wiName(w){if(!w)return'—';if(w.r)return dishLabel(w);switch(w.k){
+ case'raw':return t('bin_'+w.b)+' ('+(w.cat==='noodle'?t('pack_sfx'):t('ck_raw'))+')';
+ case'prep':return w.cat==='noodle'?dishLabel({r:NOODLE_R[w.b],top:w.top}):menuName(FRY_R[w.b]);
+ case'bowl':case'pot':return dishLabel({r:NOODLE_R[w.b],top:w.top});
+ case'fry':return menuName(FRY_R[w.b]);case'fried':return menuName(FRY_R[w.b])+' · '+t('ck_'+w.cook);
+ case'cup':return[w.ice?t('bin_da'):'',w.base?t('bin_'+w.base):'',w.flavor?t('bin_'+w.flavor):''].filter(Boolean).join(' + ')||t('bin_ly');
+ case'trash':return t('step_RUINED')}return'—'}
+/* Món xong đi đâu:
+   đầu bếp → Quầy ra món nếu đã mua, chưa có thì lên khay của bạn
+   người chơi → khay; khay đầy và có Quầy ra món thì đặt lên quầy */
+function canFinish(){
+ if(ACTOR==='cook')return hasPickup()?S.pickup.includes(null):S.carry.length<carryMax();
+ return S.carry.length<carryMax()||(hasPickup()&&S.pickup.includes(null))}
+function finishDish(d){
+ if(ACTOR==='cook'){
+  if(hasPickup()){const i=S.pickup.indexOf(null);if(i<0)return false;S.pickup[i]=d;return true}
+  if(S.carry.length<carryMax()){S.carry.push(d);return true}return false}
+ if(S.carry.length<carryMax()){S.carry.push(d);return true}
+ if(hasPickup()){const i=S.pickup.indexOf(null);if(i>=0){S.pickup[i]=d;fx.toast(t('toast_park'));return true}}
+ return false}
+const errFull=()=>KE(ACTOR==='cook'&&hasPickup()?'err_pickup_full':'err_carry_full');
+function pickTarget(st,pred){const a=S.k[st],s=S.sel[st];if(s!=null&&a[s]&&pred(a[s]))return s;const i=a.findIndex(w=>w&&pred(w));if(i>=0)S.sel[st]=i;return i}
+function placeCup(i){if(S.k.bar[i])return KE('err_station_busy',{st:t('st_bar')});if(!S.inv.ly)return KE('err_stock',{item:itemName('ly')});
+ takeStock('ly');S.k.bar[i]={k:'cup',st:'open',ice:false,base:null,flavor:null,t:0};if(ACTOR==='cook')S.k.bar[i].by='cook';S.sel.bar=i;return KO('TAKE_CUP')}
+/* bấm hũ / ngăn nguyên liệu */
+function kBin(st,id){
+ const K=KIT[st];if(!K||!(K.bins||[]).some(b=>b[0]===id))return KE('err_generic');
+ const h=S.hand,has=()=>id==='da'||(S.inv[id]||0)>0,cook=ACTOR==='cook';
+ if(st==='noodlebox'||st==='freezer'){const cat=st==='noodlebox'?'noodle':'fried';
+  if(h&&h.k==='raw'&&h.cat===cat){
+   if(h.b===id){returnStock(h.b,h.exp);S.hand=null;return KO('RETURN')}
+   if(!has())return KE('err_stock',{item:itemName(id)});
+   returnStock(h.b,h.exp);const tk=takeStock(id);S.hand={k:'raw',cat,b:id,exp:tk?tk.exp:null};return KO('SWAP')}
+  if(h)return KE('err_hand_full',{item:wiName(h)});if(!has())return KE('err_stock',{item:itemName(id)});
+  const tk=takeStock(id);S.hand={k:'raw',cat,b:id,exp:tk?tk.exp:null};return KO(cat==='noodle'?'TAKE_NOODLES':'TAKE_FRY')}
+ if(st==='fridge'){if(!canFinish())return errFull();if(!has())return KE('err_stock',{item:itemName(id)});
+  takeStock(id);finishDish(newDish(id,[],100));return KO('TAKE_DRINK')}
+ if(st==='board'){
+  const i=pickTarget('board',w=>w.k==='prep'&&w.cat==='noodle'&&!w.top.includes(id)&&w.top.length<3&&cook===isCookItem(w));
+  if(i<0)return KE('err_no_target_top');if(!has())return KE('err_stock',{item:itemName(id)});
+  takeStock(id);S.k.board[i].top.push(id);return KO('ADD_TOPPING')}
+ if(st==='bar'){
+  if(id==='ly'){const i=S.k.bar.indexOf(null);if(i<0)return KE('err_station_busy',{st:t('st_bar')});return placeCup(i)}
+  const slot=id==='da'?'ice':BASES.includes(id)?'base':'flavor';
+  const i=pickTarget('bar',w=>w.st==='open'&&!w[slot]&&cook===isCookItem(w));if(i<0)return KE('err_no_target_cup');
+  if(!has())return KE('err_stock',{item:itemName(id)});
+  if(id!=='da')takeStock(id);const w=S.k.bar[i];w[slot]=id==='da'?true:id;
+  if(w.base&&w.flavor){w.st='shaking';w.t=0}  /* đủ trà/cà phê + vị là tự lắc */
+  return KO(slot==='ice'?'ADD_ICE':slot==='base'?'ADD_BASE':'ADD_FLAVOR')}
+ return KE('err_generic')}
+/* bấm ô trên trạm */
+function kTap(st,i){
+ if(st==='pickup')return pickupTap(i);
+ if(st==='trash')return kTrash();
+ const arr=S.k[st];if(!arr||!(i>=0&&i<arr.length))return KE('err_generic');
+ const w=arr[i],h=S.hand,cook=ACTOR==='cook';
+ if(w&&isCookItem(w)!==cook)return KE(cook?'err_generic':'err_cook_item');
+ const mine=o=>{if(cook)o.by='cook';if(h&&h.want)o.want=h.want;return o};
+ if(st==='board'||st==='bar')S.sel[st]=i;
+ if(st==='board'){
+  if(!w){
+   if(h&&h.k==='raw'&&h.cat==='noodle'){if(!S.inv.to)return KE('err_stock',{item:itemName('to')});
+    takeStock('to');arr[i]=mine({k:'prep',cat:'noodle',b:h.b,t:0,done:false,top:[]});S.hand=null;return KO('PLACE')}
+   if(h&&h.k==='fried'){if(!S.inv.dia)return KE('err_stock',{item:itemName('dia')});if(!S.inv.tuong)return KE('err_stock',{item:itemName('tuong')});
+    takeStock('dia');takeStock('tuong');arr[i]=mine({k:'prep',cat:'fried',b:h.b,cook:h.cook,t:0,done:false,top:[]});S.hand=null;return KO('PLATE')}
+   if(h&&h.k==='bowl'){arr[i]=mine({k:'prep',cat:'noodle',b:h.b,t:PREP.noodle,done:true,top:h.top.slice()});S.hand=null;return KO('PUT_BACK')}
+   return h?KE('err_wrong_place',{item:wiName(h)}):KE('err_empty_spot')}
+  if(!w.done)return KE('err_not_ready');
+  if(w.cat==='noodle'){if(h)return KE('err_hand_full',{item:wiName(h)});
+   S.hand={k:'bowl',b:w.b,top:w.top.slice()};if(w.want)S.hand.want=w.want;if(cook)S.hand.by='cook';arr[i]=null;return KO('PICK_BOWL')}
+  if(!canFinish())return errFull();
+  finishDish(newDish(FRY_R[w.b],[],QUAL.fried[w.cook]||50));arr[i]=null;return KO('DONE')}
+ if(st==='stove'){
+  if(!w){if(h&&h.k==='bowl'){arr[i]=mine({k:'pot',b:h.b,top:h.top.slice(),t:0});S.hand=null;return KO('COOK')}
+   return h?KE('err_wrong_place',{item:wiName(h)}):KE('err_empty_spot')}
+  const cs=cookState(w.t,COOK.noodle);
+  if(cs==='ruined'){if(h)return KE('err_hand_full',{item:wiName(h)});S.hand={k:'trash'};arr[i]=null;return KO('RUINED')}
+  if(!canFinish())return errFull();
+  finishDish(newDish(NOODLE_R[w.b],w.top,QUAL.noodle[cs]));arr[i]=null;return KO('TAKE_OUT')}
+ if(st==='fryer'){
+  if(!w){if(h&&h.k==='raw'&&h.cat==='fried'){arr[i]=mine({k:'fry',b:h.b,t:0});S.hand=null;return KO('PUT_IN_FRYER')}
+   return h?KE('err_wrong_place',{item:wiName(h)}):KE('err_empty_spot')}
+  if(h)return KE('err_hand_full',{item:wiName(h)});
+  const cs=cookState(w.t,COOK.fried);S.hand=cs==='ruined'?{k:'trash'}:{k:'fried',b:w.b,cook:cs};
+  if(w.want&&cs!=='ruined')S.hand.want=w.want;if(cook)S.hand.by='cook';arr[i]=null;return KO(cs==='ruined'?'RUINED':'REMOVE')}
+ if(st==='bar'){
+  if(!w)return placeCup(i);
+  if(w.st==='open')return KE(!w.base?'err_need_base':'err_need_flavor');
+  if(w.st==='shaking')return KE('err_shaking');
+  const r=mixRecipe(w);
+  if(!r){if(h)return KE('err_hand_full',{item:wiName(h)});S.hand={k:'trash'};arr[i]=null;return KO('BAD_MIX')}
+  if(!canFinish())return errFull();
+  finishDish(newDish(r,[],w.ice?100:80));arr[i]=null;return KO('DONE')}
+ return KE('err_generic')}
+function kTrash(){if(!S.hand)return KE('err_hand_empty');S.hand=null;return KO('TRASH')}
+function kDiscard(st,i){if((st!=='board'&&st!=='bar')||!S.k[st]||!S.k[st][i])return KE('err_empty_spot');
+ if(isCookItem(S.k[st][i]))return KE('err_cook_item');S.k[st][i]=null;return KO('DISCARD')}
+/* Quầy ra món (chỉ khi đã mua): có món → lấy lên khay; ô trống → đặt món đang bưng (ưu tiên món chưa có khách nhận) */
+function pickupTap(i){if(!hasPickup())return KE('err_generic');const d=S.pickup[i];
+ if(d){if(S.carry.length>=carryMax())return KE('err_carry_full');S.carry.push(d);S.pickup[i]=null;refreshMatch();return KO('COLLECT')}
+ if(!S.carry.length)return KE('err_empty_spot');
+ const m=refreshMatch();let j=S.carry.findIndex(x=>!m.byObj.get(x));if(j<0)j=0;
+ S.pickup[i]=S.carry.splice(j,1)[0];refreshMatch();return KO('PARK')}
+function stationTick(dt){
+ applyUpgrades();const u=S.upg||{};
+ for(const w of S.k.board)if(w&&!w.done){w.t+=dt;if(w.t>=PREP[w.cat]){w.done=true;fx.sfx('ding')}}
+ for(const[st,p,auto]of[['stove',COOK.noodle,u.stove_auto],['fryer',COOK.fried,u.fryer_auto]])for(const w of S.k[st])if(w){
+  const a=cookState(w.t,p);w.t+=dt;if(auto&&(a==='under'||a==='perfect'))w.t=Math.min(w.t,p.T+p.ok*.5);
+  const b=cookState(w.t,p);if(a!==b){if(b==='perfect')fx.sfx('ding');else if(b==='ruined')fx.sfx('error')}}
+ for(const w of S.k.bar)if(w&&w.st==='shaking'){w.t+=dt;if(w.t>=COOK.shake){w.st='done';fx.sfx('ding')}}
+ staffTick(dt);refreshMatch()}
+
+/* ================= 5. MATCHING: món nào đang dành cho khách nào ================= */
+function unitOf(w){if(!w||w.k==='trash')return null;
+ if(w.r)return{r:w.r,top:w.top||[]};
+ switch(w.k){
+  case'raw':return{r:w.want?w.want.r:(w.cat==='noodle'?NOODLE_R[w.b]:FRY_R[w.b]),top:[],stage:2};
+  case'prep':return w.cat==='noodle'?{r:NOODLE_R[w.b],top:w.top,stage:w.done?5:4}:{r:FRY_R[w.b],top:[],stage:w.done?7:6};
+  case'bowl':return{r:NOODLE_R[w.b],top:w.top,stage:5};
+  case'pot':return cookState(w.t,COOK.noodle)==='ruined'?null:{r:NOODLE_R[w.b],top:w.top,stage:6};
+  case'fry':return cookState(w.t,COOK.fried)==='ruined'?null:{r:FRY_R[w.b],top:[],stage:4};
+  case'fried':return{r:FRY_R[w.b],top:[],stage:5};
+  case'cup':{const r=mixRecipe(w)||(w.want&&w.want.r);return r?{r,top:[],stage:w.st==='done'?7:w.st==='shaking'?6:3}:null}}
+ return null}
+/* Món đã xong phải ĐÚNG Y topping; gói mì / tô còn trên Bàn sơ chế được ghép nếu chưa dư topping (để nhắc +topping) */
+function matchAll(){
+ const units=[],push=(obj,src,stage)=>{const u=unitOf(obj);if(u)units.push({obj,src,r:u.r,top:u.top,stage:stage!=null?stage:u.stage,
+  open:!!(obj&&obj.cat==='noodle'&&(obj.k==='prep'||obj.k==='raw'))})};
+ S.carry.forEach(d=>push(d,'carry',9));S.pickup.forEach(d=>d&&push(d,'pickup',8));
+ for(const st in S.k)S.k[st].forEach(w=>w&&push(w,st));
+ push(S.hand,'hand');if(S.staff){push(S.staff.hand,'cook');if(S.staff.ph)push(S.staff.ph,'hand')}
+ const orders=[];for(const c of S.customers)if(c.order&&c.state!=='LEAVING')c.order.items.forEach((it,i)=>{if(!it.done)orders.push({c,it,i,t:c.order.t})});
+ orders.sort((a,b)=>a.t-b.t||a.c.id-b.c.id);
+ const byObj=new Map();
+ for(const o of orders){let best=null,bs=-1;const ot=o.it.top||[];
+  for(const u of units){if(u.o||u.r!==o.it.r)continue;const ut=u.top||[],ex=sameTop(ot,ut);
+   if(!ex&&!(u.open&&ut.every(x=>ot.includes(x))))continue;
+   const sc=u.stage*10+(ex?5:0);if(sc>bs){bs=sc;best=u}}
+  if(best){best.o=o;o.u=best;byObj.set(best.obj,o)}}
+ return{orders,units,byObj}}
+function refreshMatch(){MATCH=matchAll();return MATCH}
+function orderReady(c){const m=refreshMatch();return m.orders.some(o=>o.c===c&&o.u&&(o.u.src==='carry'||o.u.src==='pickup'))}
+function itemStatus(c,i){const it=c.order&&c.order.items[i];if(!it)return'os_todo';if(it.done)return'os_done';
+ const m=MATCH||matchAll(),o=m.orders.find(x=>x.c===c&&x.i===i);if(!o||!o.u)return'os_todo';
+ return{carry:'os_carry',pickup:'os_pickup',stove:'os_cooking',board:'os_prep',fryer:'os_frying',bar:'os_mixing',hand:'os_hand',cook:'os_hand'}[o.u.src]||'os_todo'}
+
+/* ================= 5. DELIVERY ================= */
+function collectFor(c){const m=refreshMatch();let n=0;
+ for(let i=0;i<S.pickup.length;i++){const d=S.pickup[i];if(!d)continue;const o=m.byObj.get(d);
+  if(o&&o.c===c&&S.carry.length<carryMax()){S.carry.push(d);S.pickup[i]=null;n++}}
+ if(n)refreshMatch();return n}
+function canDeliverTo(c){const m=MATCH||matchAll();return m.orders.some(o=>o.c===c&&o.u&&(o.u.src==='carry'||o.u.src==='pickup'))}
+/* Giao: khách chỉ nhận món đúng y topping */
+function deliverTo(c){
+ const res={n:0,earned:0,gain:0,minQ:100};let wrong=null;if(!c||!c.order||!isSeated(c))return res;
+ for(const it of c.order.items){if(it.done)continue;
+  let k=-1,best=-1;S.carry.forEach((d,j)=>{if(d.r!==it.r)return;if(!sameTop(it.top,d.top)){if(!wrong)wrong=it;return}if(d.q>best){best=d.q;k=j}});
+  if(k<0)continue;
+  const d=S.carry.splice(k,1)[0];it.done=true;const R=MENU_BY[it.r],price=itemPrice(it);
+  c.money=Math.max(0,c.money-price);addTx(price,R.kind==='food'?'FOOD_SALE':'DRINK_SALE',dishLabel(it)+' — '+c.name);
+  S.today[R.kind]+=price;S.today.sold[it.r]=(S.today.sold[it.r]||0)+1;if(R.kind==='food')c.hunger=0;else c.thirst=0;
+  const q=d.q;res.gain+=q>=90?8:q>=70?4:q>=50?0:-8;res.minQ=Math.min(res.minQ,q);res.n++;res.earned+=price}
+ if(res.n){if(c.orderPatience>c.orderPatienceMax*.5)res.gain+=4;c.happiness=clamp(c.happiness+res.gain,0,100);
+  fx.sfx('cash');fx.float(c.x,c.y-80,'+'+vnd(res.earned),'#2f8a47');fx.float(c.x+24,c.y-58,(res.gain>=0?'❤ +':'💔 ')+res.gain,res.gain>=0?'#E85D5D':'#7a6f63');
+  finishOrderIfDone(c);if(res.minQ<50)say(c,line('bad'),14);else if(res.minQ<70)say(c,line('meh'),12);refreshMatch()}
+ else if(wrong){say(c,line('wrong_top'),12);fx.err('err_wrong_top',{item:dishLabel(wrong)})}
+ return res}
+function discardCarry(i){if(i<0||i>=S.carry.length)return null;const d=S.carry.splice(i,1)[0];refreshMatch();return d}
+
+/* ================= 5. STAFF AI ================= */
+/* Đầu bếp: mỗi lần 1 thao tác. Chỉ đụng vào món của mình (by:'cook'). Hết chỗ đặt món xong thì đứng chờ. */
+function cookStep(){
+ const h=S.hand,own=isCookItem,go=(st,fn)=>{const r=fn();return r&&r.ok?{st}:null},free=st=>S.k[st].indexOf(null),room=canFinish();
+ if(h){
+  if(h.k==='trash')return go('trash',kTrash);
+  if(h.k==='bowl'){const f=free('stove');return f<0?null:go('stove',()=>kTap('stove',f))}
+  if(h.k==='raw'&&h.cat==='noodle'){const f=free('board');return f<0?null:go('board',()=>kTap('board',f))}
+  if(h.k==='raw'){const f=free('fryer');return f<0?null:go('fryer',()=>kTap('fryer',f))}
+  if(h.k==='fried'){const f=free('board');return f<0?null:go('board',()=>kTap('board',f))}
+  return go('trash',kTrash)}
+ for(let i=0;i<S.k.stove.length;i++){const w=S.k.stove[i];if(!own(w))continue;const cs=cookState(w.t,COOK.noodle);if(cs==='ruined'||(cs!=='under'&&room))return go('stove',()=>kTap('stove',i))}
+ for(let i=0;i<S.k.fryer.length;i++){const w=S.k.fryer[i];if(!own(w))continue;const cs=cookState(w.t,COOK.fried);if(cs==='ruined'||(cs!=='under'&&free('board')>=0))return go('fryer',()=>kTap('fryer',i))}
+ for(let i=0;i<S.k.bar.length;i++){const w=S.k.bar[i];if(!own(w))continue;
+  if(w.st==='done'){if(room)return go('bar',()=>kTap('bar',i));continue}
+  if(w.st==='open'&&w.want){const m=MIX[w.want.r];if(!m)continue;S.sel.bar=i;
+   if(!w.ice)return go('bar',()=>kBin('bar','da'));if(!w.base)return go('bar',()=>kBin('bar',m.base));if(!w.flavor)return go('bar',()=>kBin('bar',m.flavor))}}
+ for(let i=0;i<S.k.board.length;i++){const w=S.k.board[i];if(!own(w))continue;S.sel.board=i;
+  if(w.cat==='noodle'){const need=((w.want&&w.want.top)||[]).filter(x=>!w.top.includes(x)&&(S.inv[x]||0)>0);
+   if(need.length)return go('board',()=>kBin('board',need[0]));if(w.done&&free('stove')>=0)return go('board',()=>kTap('board',i))}
+  else if(w.done&&room)return go('board',()=>kTap('board',i))}
+ const o=refreshMatch().orders.find(x=>!x.u&&hasStockFor(x.it.r));if(!o)return null;
+ const R=MENU_BY[o.it.r],want={r:R.id,top:(o.it.top||[]).slice()};
+ if(R.type==='bottle')return room?go('fridge',()=>kBin('fridge',R.id)):null;
+ if(R.type==='noodle'){if(free('board')<0)return null;return go('noodlebox',()=>{const r=kBin('noodlebox',R.base);if(r.ok)S.hand.want=want;return r})}
+ if(R.type==='fried'){if(free('fryer')<0)return null;return go('freezer',()=>{const r=kBin('freezer',R.base);if(r.ok)S.hand.want=want;return r})}
+ if(R.type==='mix'){const f=free('bar');if(f<0)return null;return go('bar',()=>{const r=placeCup(f);if(r.ok)S.k.bar[f].want=want;return r})}
+ return null}
+function cookAct(){const sf=S.staff,ph=S.hand;S.hand=sf.hand||null;sf.hand=null;sf.ph=ph;ACTOR='cook';let r=null;
+ try{r=cookStep()}finally{sf.hand=S.hand;S.hand=ph;delete sf.ph;ACTOR='player'}if(r)sf.st=r.st;return r}
+/* Thu ngân: gọi khách đầu hàng → lần sau nạp đúng số khách xin + xếp máy đúng loại; tự nạp cho khách đang chơi */
+function cashierStep(){
+ const sf=S.staff,cash=c=>Math.floor(cashFree(c)/10000)*10000;
+ if(sf.serving){const c=custById(sf.serving);sf.serving=null;
+  if(c&&inQueue(c)){const free=S.pcs.filter(p=>p.status==='AVAILABLE');
+   if(free.length){const pc=free.find(p=>p.tier===c.preferredPC)||free[0];
+    if(c.balance<pc.hourlyRate/4){const a=Math.min(Math.max(c.askAmt||0,10000),cash(c));if(a>0)recharge(c,a)}
+    if(assignPC(c,pc).ok)return true}
+   if(c.state==='SERVING')c.state='QUEUE'}
+  return false}
+ const rc=S.customers.find(c=>isSeated(c)&&(c.rechargeReq||c.state==='RECHARGE'));
+ if(rc){const a=Math.min(rc.rechargeReq||10000,cash(rc));if(a>0&&recharge(rc,a).ok)return true}
+ const f=queueFront();if(!f||f.state!=='QUEUE'||f.id===SERVING||!S.pcs.some(p=>p.status==='AVAILABLE'))return false;
+ f.state='SERVING';sf.serving=f.id;return true}
+function staffTick(dt){const sf=S.staff;if(!sf||(S.phase!=='OPEN'&&S.phase!=='CLOSING'))return;const D=STAFF[sf.type];sf.t=(sf.t||0)+dt;
+ let g=0;while(sf.t>=D.every&&g++<6){sf.t-=D.every;if(sf.type==='cook')cookAct();else cashierStep()}}
